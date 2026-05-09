@@ -100,4 +100,140 @@ export function registerRecordTools(server: McpServer, registry: EnvironmentRegi
       }
     }
   );
+
+  // Create Record
+  server.registerTool(
+    "create-record",
+    {
+      title: "Create Record",
+      description: "Create a record. Lookups use @odata.bind, e.g. { 'primarycontactid@odata.bind': '/contacts(<guid>)' }.",
+      inputSchema: {
+        entityNamePlural: z.string().describe("Plural entity name (e.g. 'accounts', 'contacts')"),
+        data: z.record(z.string(), z.any()).describe("Record payload as JSON object"),
+        environment: z.string().optional(),
+      },
+      outputSchema: z.object({ entityNamePlural: z.string(), entityId: z.string() }),
+    },
+    async ({ entityNamePlural, data, environment }) => {
+      try {
+        const ctx = registry.getContext(environment);
+        const service = ctx.getRecordService();
+        const result = await service.createRecord(entityNamePlural, data);
+        return {
+          structuredContent: { entityNamePlural, entityId: result.entityId },
+          content: [{ type: "text", text: `Created record in '${entityNamePlural}' (ID: ${result.entityId})` }],
+        };
+      } catch (error: any) {
+        console.error("Error creating record:", error);
+        return { content: [{ type: "text", text: `Failed to create record: ${error.message}` }] };
+      }
+    }
+  );
+
+  // Update Record
+  server.registerTool(
+    "update-record",
+    {
+      title: "Update Record",
+      description: "Update a record via PATCH (partial update).",
+      inputSchema: {
+        entityNamePlural: z.string(),
+        recordId: z.string(),
+        data: z.record(z.string(), z.any()).describe("Partial record payload"),
+        environment: z.string().optional(),
+      },
+    },
+    async ({ entityNamePlural, recordId, data, environment }) => {
+      try {
+        const ctx = registry.getContext(environment);
+        const service = ctx.getRecordService();
+        await service.updateRecord(entityNamePlural, recordId, data);
+        return { content: [{ type: "text", text: `Updated record '${recordId}' in '${entityNamePlural}'` }] };
+      } catch (error: any) {
+        console.error("Error updating record:", error);
+        return { content: [{ type: "text", text: `Failed to update record: ${error.message}` }] };
+      }
+    }
+  );
+
+  // Delete Record
+  server.registerTool(
+    "delete-record",
+    {
+      title: "Delete Record",
+      description: "Delete a record. Irreversible.",
+      inputSchema: {
+        entityNamePlural: z.string(),
+        recordId: z.string(),
+        environment: z.string().optional(),
+      },
+    },
+    async ({ entityNamePlural, recordId, environment }) => {
+      try {
+        const ctx = registry.getContext(environment);
+        const service = ctx.getRecordService();
+        await service.deleteRecord(entityNamePlural, recordId);
+        return { content: [{ type: "text", text: `Deleted record '${recordId}' from '${entityNamePlural}'` }] };
+      } catch (error: any) {
+        console.error("Error deleting record:", error);
+        return { content: [{ type: "text", text: `Failed to delete record: ${error.message}` }] };
+      }
+    }
+  );
+
+  // Associate Records
+  server.registerTool(
+    "associate-records",
+    {
+      title: "Associate Records",
+      description: "Associate two records across a navigation property (N:N or 1:N).",
+      inputSchema: {
+        entityNamePlural: z.string().describe("Plural name of the primary entity"),
+        recordId: z.string().describe("GUID of the primary record"),
+        navigationProperty: z.string().describe("Navigation property name (from entity metadata)"),
+        relatedEntityNamePlural: z.string().describe("Plural name of the related entity"),
+        relatedRecordId: z.string().describe("GUID of the record to link"),
+        environment: z.string().optional(),
+      },
+    },
+    async ({ entityNamePlural, recordId, navigationProperty, relatedEntityNamePlural, relatedRecordId, environment }) => {
+      try {
+        const ctx = registry.getContext(environment);
+        const service = ctx.getRecordService();
+        await service.associateRecords(entityNamePlural, recordId, navigationProperty, relatedEntityNamePlural, relatedRecordId);
+        return { content: [{ type: "text", text: `Associated ${entityNamePlural}(${recordId}) → ${navigationProperty} → ${relatedEntityNamePlural}(${relatedRecordId})` }] };
+      } catch (error: any) {
+        console.error("Error associating records:", error);
+        return { content: [{ type: "text", text: `Failed to associate records: ${error.message}` }] };
+      }
+    }
+  );
+
+  // Disassociate Records
+  server.registerTool(
+    "disassociate-records",
+    {
+      title: "Disassociate Records",
+      description: "Disassociate two records across a navigation property.",
+      inputSchema: {
+        entityNamePlural: z.string(),
+        recordId: z.string(),
+        navigationProperty: z.string(),
+        relatedRecordId: z.string().optional().describe("Required for collection-valued navs (N:N), omit for single-valued (1:N)"),
+        environment: z.string().optional(),
+      },
+    },
+    async ({ entityNamePlural, recordId, navigationProperty, relatedRecordId, environment }) => {
+      try {
+        const ctx = registry.getContext(environment);
+        const service = ctx.getRecordService();
+        await service.disassociateRecords(entityNamePlural, recordId, navigationProperty, relatedRecordId);
+        const target = relatedRecordId ? `(${relatedRecordId})` : '';
+        return { content: [{ type: "text", text: `Disassociated ${entityNamePlural}(${recordId}) → ${navigationProperty}${target}` }] };
+      } catch (error: any) {
+        console.error("Error disassociating records:", error);
+        return { content: [{ type: "text", text: `Failed to disassociate records: ${error.message}` }] };
+      }
+    }
+  );
 }

@@ -324,4 +324,65 @@ export function registerSolutionTools(server: McpServer, registry: EnvironmentRe
       }
     }
   );
+
+  // Update Solution Version
+  server.registerTool(
+    "update-solution-version",
+    {
+      title: "Update Solution Version",
+      description: "Update the version of an existing solution. Used for releases (e.g. '1.0.0.0' → '1.0.1.0').",
+      inputSchema: {
+        uniqueName: z.string().describe("The unique name of the solution"),
+        version: z.string().describe("New version string (4-part: major.minor.build.revision)"),
+        environment: z.string().optional(),
+      },
+      outputSchema: z.object({ uniqueName: z.string(), solutionId: z.string(), version: z.string() }),
+    },
+    async ({ uniqueName, version, environment }) => {
+      try {
+        const ctx = registry.getContext(environment);
+        const service = ctx.getSolutionService();
+        const result = await service.updateSolutionVersion(uniqueName, version);
+        return {
+          structuredContent: { uniqueName, ...result },
+          content: [{ type: "text", text: `Solution '${uniqueName}' version updated to ${result.version}` }],
+        };
+      } catch (error: any) {
+        console.error("Error updating solution version:", error);
+        return { content: [{ type: "text", text: `Failed to update solution version: ${error.message}` }] };
+      }
+    }
+  );
+
+  // Create Solution
+  server.registerTool(
+    "create-solution",
+    {
+      title: "Create Solution",
+      description: "Create a new unmanaged solution. The publisher must already exist (use get-publishers to find one).",
+      inputSchema: {
+        uniqueName: z.string().describe("Technical unique name (letters/digits/underscores). Convention: '{YYYYMMDD} - {EpicName}'"),
+        friendlyName: z.string().describe("Display name shown in the maker portal"),
+        publisherUniqueName: z.string().describe("Unique name of an existing publisher"),
+        version: z.string().optional().describe("Default: '1.0.0.0'"),
+        description: z.string().optional(),
+        environment: z.string().optional(),
+      },
+      outputSchema: z.object({ uniqueName: z.string(), solutionId: z.string() }),
+    },
+    async ({ uniqueName, friendlyName, publisherUniqueName, version, description, environment }) => {
+      try {
+        const ctx = registry.getContext(environment);
+        const service = ctx.getSolutionService();
+        const result = await service.createSolution(uniqueName, friendlyName, publisherUniqueName, version ?? '1.0.0.0', description);
+        return {
+          structuredContent: { uniqueName, solutionId: result.solutionId },
+          content: [{ type: "text", text: `Created solution '${uniqueName}' (ID: ${result.solutionId})` }],
+        };
+      } catch (error: any) {
+        console.error("Error creating solution:", error);
+        return { content: [{ type: "text", text: `Failed to create solution: ${error.message}` }] };
+      }
+    }
+  );
 }

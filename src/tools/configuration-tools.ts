@@ -197,4 +197,36 @@ export function registerConfigurationTools(server: McpServer, registry: Environm
       }
     }
   );
+
+  // Create Connection Reference
+  server.registerTool(
+    "create-connection-reference",
+    {
+      title: "Create Connection Reference",
+      description: "Create a connection reference. When solutionName is provided, places it directly in that solution.",
+      inputSchema: {
+        logicalName: z.string().describe("Connection reference logical name (e.g. 'new_SharedSharepointonline')"),
+        displayName: z.string(),
+        connectorId: z.string().describe("Connector ID, e.g. '/providers/Microsoft.PowerApps/apis/shared_sharepointonline'"),
+        description: z.string().optional(),
+        solutionName: z.string().optional(),
+        environment: z.string().optional(),
+      },
+      outputSchema: z.object({ connectionReferenceId: z.string() }),
+    },
+    async ({ logicalName, displayName, connectorId, description, solutionName, environment }) => {
+      try {
+        const ctx = registry.getContext(environment);
+        const service = ctx.getConfigurationService();
+        const result = await service.createConnectionReference({ logicalName, displayName, connectorId, description, solutionName });
+        return {
+          structuredContent: { connectionReferenceId: result.connectionReferenceId },
+          content: [{ type: "text", text: `Created connection reference '${logicalName}' (ID: ${result.connectionReferenceId})` }],
+        };
+      } catch (error: any) {
+        console.error("Error creating connection reference:", error);
+        return { content: [{ type: "text", text: `Failed to create connection reference: ${error.message}` }] };
+      }
+    }
+  );
 }

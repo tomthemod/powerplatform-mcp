@@ -655,6 +655,73 @@ export class PluginService {
     return { imageId: result?.entityId ?? 'created' };
   }
 
+  /**
+   * Enable a plugin step (set statecode=0, statuscode=1).
+   */
+  async enablePluginStep(stepId: string): Promise<void> {
+    await this.client.patch(
+      `api/data/v9.2/sdkmessageprocessingsteps(${stepId})`,
+      { statecode: 0, statuscode: 1 },
+    );
+  }
+
+  /**
+   * Disable a plugin step (set statecode=1, statuscode=2).
+   */
+  async disablePluginStep(stepId: string): Promise<void> {
+    await this.client.patch(
+      `api/data/v9.2/sdkmessageprocessingsteps(${stepId})`,
+      { statecode: 1, statuscode: 2 },
+    );
+  }
+
+  /**
+   * Delete a plugin step. Irreversible — the step's images are also deleted by Dataverse cascade.
+   * Caller should run check-component-dependencies first if the step is part of a managed solution.
+   */
+  async deletePluginStep(stepId: string): Promise<void> {
+    await this.client.delete(`api/data/v9.2/sdkmessageprocessingsteps(${stepId})`);
+  }
+
+  /**
+   * Register a traditional plugin assembly (.dll) by uploading its base64-encoded content.
+   * Use this for non-package plugins. For .nupkg-based packages, use registerPluginPackage instead.
+   *
+   * @param name Assembly name (display + identifier)
+   * @param content Base64-encoded .dll bytes
+   * @param version Assembly version (e.g. '1.0.0.0')
+   * @param isolationMode 1=None, 2=Sandbox (default 2 — Dataverse online forces sandbox anyway)
+   * @param solutionName Optional solution unique name to add the assembly to
+   * @param description Optional description
+   */
+  async registerPluginAssembly(options: {
+    name: string;
+    content: string;
+    version: string;
+    isolationMode?: 1 | 2;
+    solutionName?: string;
+    description?: string;
+  }): Promise<{ pluginAssemblyId: string }> {
+    const body: Record<string, unknown> = {
+      name: options.name,
+      content: options.content,
+      version: options.version,
+      isolationmode: options.isolationMode ?? 2,
+      sourcetype: 0,
+    };
+    if (options.description) {
+      body.description = options.description;
+    }
+
+    const headers = options.solutionName ? { 'MSCRM.SolutionUniqueName': options.solutionName } : undefined;
+    const result = await this.client.post<{ entityId?: string }>(
+      'api/data/v9.2/pluginassemblies',
+      body,
+      headers,
+    );
+    return { pluginAssemblyId: result?.entityId ?? 'created' };
+  }
+
   private getOperationTypeName(operationType: number): string {
     const types: { [key: number]: string } = {
       0: 'None',

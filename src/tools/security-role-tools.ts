@@ -97,4 +97,33 @@ export function registerSecurityRoleTools(server: McpServer, registry: Environme
       }
     }
   );
+
+  // Get Security Roles By Solution
+  server.registerTool(
+    "get-security-roles-by-solution",
+    {
+      title: "Get Security Roles By Solution",
+      description: "Get the security roles that are included as components of a specific solution.",
+      inputSchema: {
+        solutionUniqueName: z.string().describe("The unique name of the solution"),
+        includePrivileges: z.boolean().optional().describe("Include privilege details for each role (default: false)"),
+        environment: z.string().optional(),
+      },
+      outputSchema: z.object({ solutionUniqueName: z.string(), count: z.number(), roles: z.any() }),
+    },
+    async ({ solutionUniqueName, includePrivileges, environment }) => {
+      try {
+        const ctx = registry.getContext(environment);
+        const service = ctx.getSecurityRoleService();
+        const result = await service.getSecurityRolesBySolution(solutionUniqueName, { includePrivileges: includePrivileges ?? false });
+        return {
+          structuredContent: { solutionUniqueName, count: result.value.length, roles: result.value },
+          content: [{ type: "text", text: `Found ${result.value.length} roles in solution '${solutionUniqueName}':\n\n${JSON.stringify(result.value, null, 2)}` }],
+        };
+      } catch (error: any) {
+        console.error("Error getting roles by solution:", error);
+        return { content: [{ type: "text", text: `Failed to get roles by solution: ${error.message}` }] };
+      }
+    }
+  );
 }

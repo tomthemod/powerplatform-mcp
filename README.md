@@ -1,416 +1,383 @@
-# PowerPlatform MCP / CLI
+# PowerPlatform MCP — Fork
 
-A Model Context Protocol (MCP) server **and** standalone CLI for querying **and configuring** PowerPlatform / Dataverse environments. Supports multiple environments, entity metadata, records, plugins, flows, solutions, workflows, business rules, security roles, custom APIs, web resources, and more — including write operations for automated environment setup.
+> **Fork de [michsob/powerplatform-mcp](https://github.com/michsob/powerplatform-mcp)** maintenu par [@tomthemod](https://github.com/tomthemod) avec des outils supplémentaires non disponibles dans le package amont.
+>
+> Serveur **Model Context Protocol (MCP)** + **CLI** pour interroger **et configurer** des environnements PowerPlatform / Dataverse depuis un client IA (Claude, Cursor, GitHub Copilot) ou en ligne de commande.
+>
+> Supporte : environnements multiples, métadonnée d'entités, enregistrements, plugins, flows, solutions, workflows, business rules, security roles, custom APIs, web resources, formulaires, vues, et plus — opérations en lecture **et en écriture**.
 
-## Why MCP + CLI?
+---
 
-**MCP** integrates directly with AI clients (Claude, Cursor, GitHub Copilot) for interactive, conversational exploration of your environments.
+## Pourquoi ce fork ?
 
-**CLI** writes results to a **file system cache** instead of returning them inline. MCP tool responses are bound by the AI client's context window, which can truncate or degrade results when querying environments with hundreds of entities, flows, or plugin steps. The CLI avoids this limitation by persisting full results to disk, making them available for follow-up analysis without context pressure. Both interfaces share the same tools and capabilities.
+Le package amont expose principalement de la lecture sur la métadonnée Dataverse plus quelques opérations d'écriture limitées (création de champs string, alternate keys, plugin steps, custom APIs, web resources, environment variables). Ce fork **ajoute la couverture write manquante** pour automatiser un projet Dynamics de bout en bout :
+
+- **Création d'entités**, de **tous les types d'attributs** (string/memo/integer/decimal/money/datetime/boolean/picklist/lookup), de **relations N:1 et N:N**
+- **Création/liaison de Global Option Sets**, de **solutions**, de **connection references**
+- **Édition de formulaires** (`add-form-field`, positionnement relatif, attachement de PCF, handlers JS, enregistrement de libraries)
+- **Édition de vues** (`add-view-column`, `add-view-column-relative`, `set-view-columns`)
+- **CRUD d'enregistrements** (create/update/delete + associate/disassociate)
+- **Plugins traditionnels** (assemblies + toggle/delete des steps)
+- **Web resources** (update / upsert / delete)
+- **Cloud flows** (création + activation/désactivation)
+- **Solutions** (création + bump de version)
+
+🆕 **Outils ajoutés par ce fork** sont marqués 🆕 dans les tableaux ci-dessous.
+
+---
 
 ## Installation
 
-Requires **Node.js 22+** (< 25).
+Pré-requis : **Node.js 22+** (< 25).
 
-### MCP Server
-
-```bash
-npm install -g powerplatform-mcp
-# or
-npx powerplatform-mcp
-```
-
-### CLI
+### Cloner et builder le fork
 
 ```bash
-npm install -g powerplatform-cli
-# or
-npx powerplatform-cli
+git clone https://github.com/tomthemod/powerplatform-mcp.git
+cd powerplatform-mcp
+npm install
+npm run build
 ```
 
-### Docker
+L'entrypoint MCP est ensuite `build/index.js`. À pointer depuis ton client MCP (cf. § Configuration).
+
+### Synchroniser avec l'amont
 
 ```bash
-# MCP Server
-docker pull ghcr.io/michsob/powerplatform-mcp
-docker run --env-file .env ghcr.io/michsob/powerplatform-mcp
-
-# CLI
-docker pull ghcr.io/michsob/powerplatform-cli
-docker run --env-file .env ghcr.io/michsob/powerplatform-cli entity-attributes account
+git remote add upstream https://github.com/michsob/powerplatform-mcp.git
+git fetch upstream
+git merge upstream/main
+npm install && npm run build
 ```
+
+---
 
 ## Configuration
 
-The tool supports **multiple environments**. Define them via environment variables:
+Le serveur supporte **plusieurs environnements**. À déclarer via variables d'environnement :
 
 ```bash
 POWERPLATFORM_ENVIRONMENTS=DEV,UAT,PROD
 
-# For each environment, set:
+# Pour chaque environnement :
 POWERPLATFORM_DEV_URL=https://dev-org.crm.dynamics.com
 POWERPLATFORM_DEV_CLIENT_ID=your-client-id
 POWERPLATFORM_DEV_CLIENT_SECRET=your-client-secret
 POWERPLATFORM_DEV_TENANT_ID=your-tenant-id
-
-POWERPLATFORM_UAT_URL=https://uat-org.crm.dynamics.com
-POWERPLATFORM_UAT_CLIENT_ID=...
-POWERPLATFORM_UAT_CLIENT_SECRET=...
-POWERPLATFORM_UAT_TENANT_ID=...
 ```
 
-For local development, copy `.env.example` to `.env` and fill in your credentials.
+Pour le développement local, copier `.env.example` en `.env` et remplir les credentials.
 
-## MCP Server
+### Exemple de `.mcp.json` (Claude Code)
 
-The MCP server is designed for AI-powered clients (Claude, Cursor, GitHub Copilot).
+```json
+{
+  "mcpServers": {
+    "powerplatform": {
+      "command": "node",
+      "args": ["C:/chemin/vers/05 - powerplatform-mcp/build/index.js"],
+      "env": {
+        "POWERPLATFORM_ENVIRONMENTS": "DEV",
+        "POWERPLATFORM_DEV_URL": "https://yourorg.crm.dynamics.com",
+        "POWERPLATFORM_DEV_CLIENT_ID": "...",
+        "POWERPLATFORM_DEV_CLIENT_SECRET": "${POWERPLATFORM_DEV_CLIENT_SECRET}",
+        "POWERPLATFORM_DEV_TENANT_ID": "..."
+      }
+    }
+  }
+}
+```
 
-### Available MCP Tools (58)
+---
 
-All tools accept an optional `environment` parameter to target a specific environment (defaults to the first configured).
+## Outils MCP
 
-#### Entity
+Tous les outils acceptent un paramètre optionnel `environment` pour cibler un environnement spécifique (par défaut, le premier configuré).
 
-| Tool | Description | Required Params | Optional |
-|------|-------------|-----------------|----------|
-| `get-entity-metadata` | Get entity metadata | `entityName` | |
-| `get-entity-attributes` | List all attributes/fields | `entityName` | |
-| `get-entity-attribute` | Get a specific attribute | `entityName`, `attributeName` | |
-| `get-entity-relationships` | Get 1:N and N:N relationships | `entityName` | |
-| `create-entity-string-attribute` | Create a Single Line of Text column | `entityName`, `schemaName`, `displayName` | `maxLength`, `requiredLevel`, `description`, `solutionName` |
-| `get-entity-keys` | List alternate keys on an entity | `entityName` | |
-| `create-entity-alternate-key` | Create an alternate key | `entityName`, `schemaName`, `displayName`, `keyAttributes` | `solutionName` |
+### Entité (métadonnée)
 
-#### Records
+| Outil | Description | Paramètres requis | Optionnels |
+|---|---|---|---|
+| `get-entity-metadata` | Métadonnée d'une entité | `entityName` | |
+| `get-entity-attributes` | Liste des attributs/champs | `entityName` | |
+| `get-entity-attribute` | Détails d'un attribut spécifique | `entityName`, `attributeName` | |
+| `get-entity-relationships` | Relations 1:N et N:N | `entityName` | |
+| `get-entity-keys` | Clés alternatives sur l'entité | `entityName` | |
+| 🆕 `create-entity` | Créer une nouvelle table custom | `schemaName`, `displayName`, `displayCollectionName`, `primaryNameSchemaName`, `primaryNameDisplayName` | `description`, `ownershipType`, `hasActivities`, `hasNotes`, `languageCode`, `solutionName` |
+| 🆕 `set-entity-icon-vector` | Définir l'icône SVG d'une entité (UI navigation) | `entityName`, `iconVectorName` | `solutionName` |
+| `create-entity-string-attribute` | Champ texte simple | `entityName`, `schemaName`, `displayName` | `maxLength`, `requiredLevel`, `description`, `solutionName` |
+| 🆕 `create-entity-memo-attribute` | Champ texte multilignes | `entityName`, `schemaName`, `displayName` | `maxLength`, `requiredLevel`, `description`, `languageCode`, `solutionName` |
+| 🆕 `create-entity-integer-attribute` | Champ nombre entier | `entityName`, `schemaName`, `displayName` | `minValue`, `maxValue`, `requiredLevel`, `description`, `languageCode`, `solutionName` |
+| 🆕 `create-entity-decimal-attribute` | Champ nombre décimal | `entityName`, `schemaName`, `displayName` | `precision`, `minValue`, `maxValue`, `requiredLevel`, `description`, `languageCode`, `solutionName` |
+| 🆕 `create-entity-money-attribute` | Champ monnaie | `entityName`, `schemaName`, `displayName` | `precisionSource`, `precision`, `minValue`, `maxValue`, `requiredLevel`, `description`, `languageCode`, `solutionName` |
+| 🆕 `create-entity-datetime-attribute` | Champ date/heure | `entityName`, `schemaName`, `displayName` | `format`, `behavior`, `requiredLevel`, `description`, `languageCode`, `solutionName` |
+| 🆕 `create-entity-boolean-attribute` | Champ Oui/Non | `entityName`, `schemaName`, `displayName` | `trueLabel`, `falseLabel`, `defaultValue`, `requiredLevel`, `description`, `languageCode`, `solutionName` |
+| 🆕 `create-entity-picklist-attribute` | Champ choix (local OU lié à un global option set) | `entityName`, `schemaName`, `displayName` | `options` (local) **OU** `globalOptionSetName` (global), `requiredLevel`, `description`, `languageCode`, `solutionName` |
+| 🆕 `create-entity-lookup-attribute` | Champ lookup (relation N:1 + colonne en un appel) | `referencingEntity`, `referencedEntity`, `relationshipSchemaName`, `lookupSchemaName`, `displayName` | `requiredLevel`, `description`, `cascadeDelete`, `languageCode`, `solutionName` |
+| 🆕 `create-entity-many-to-many-relationship` | Relation N:N (Dataverse génère l'intersect entity) | `entity1LogicalName`, `entity2LogicalName`, `relationshipSchemaName` | `intersectEntitySchemaName`, `entity1NavLabel`, `entity2NavLabel`, `languageCode`, `solutionName` |
+| `create-entity-alternate-key` | Clé alternative | `entityName`, `schemaName`, `displayName`, `keyAttributes` | `solutionName` |
+| 🆕 `delete-entity-attribute` | Supprimer un attribut (irréversible) | `entityName`, `attributeName` | |
 
-| Tool | Description | Required Params | Optional |
-|------|-------------|-----------------|----------|
-| `get-record` | Get a record by ID | `entityNamePlural`, `recordId` | |
-| `query-records` | OData query | `entityNamePlural`, `filter` | `maxRecords` (default 50) |
+### Option Sets
 
-#### Plugins
+| Outil | Description | Paramètres requis | Optionnels |
+|---|---|---|---|
+| `get-global-option-set` | Détails d'un global option set | `optionSetName` | |
+| 🆕 `create-global-option-set` | Créer un global option set réutilisable | `name`, `displayName`, `options` | `description`, `languageCode`, `solutionName` |
 
-| Tool | Description | Required Params | Optional |
-|------|-------------|-----------------|----------|
-| `get-plugin-assemblies` | List plugin assemblies | | `includeManaged`, `maxRecords` |
-| `get-plugin-assembly-complete` | Assembly with types, steps, images | `assemblyName` | `includeDisabled` |
-| `get-entity-plugin-pipeline` | Plugins executing on an entity | `entityName` | `messageFilter`, `includeDisabled` |
-| `get-plugin-trace-logs` | Plugin trace logs | | `entityName`, `messageName`, `correlationId`, `pluginStepId`, `exceptionOnly`, `hoursBack`, `maxRecords` |
-| `get-all-plugin-steps` | All SDK message processing steps | | `includeDisabled`, `maxRecords` |
-| `get-plugin-type` | Look up a plugin type by class name | `typeName` | |
-| `get-sdk-message` | Look up an SDK message by name | `messageName` | |
-| `create-plugin-step` | Register a plugin step | `name`, `pluginTypeId`, `sdkMessageId`, `stage`, `mode` | `rank`, `supportedDeployment`, `description`, `configuration`, `sdkMessageFilterId`, `solutionName` |
+### Enregistrements (CRUD)
 
-#### Flows (Power Automate)
+| Outil | Description | Paramètres requis | Optionnels |
+|---|---|---|---|
+| `get-record` | Lire un enregistrement par ID | `entityNamePlural`, `recordId` | |
+| `query-records` | Requête OData | `entityNamePlural`, `filter` | `maxRecords` (défaut 50) |
+| 🆕 `create-record` | Créer un enregistrement (lookups via `@odata.bind`) | `entityNamePlural`, `data` | |
+| 🆕 `update-record` | PATCH partiel | `entityNamePlural`, `recordId`, `data` | |
+| 🆕 `delete-record` | Supprimer un enregistrement | `entityNamePlural`, `recordId` | |
+| 🆕 `associate-records` | Lier deux enregistrements (N:N ou 1:N) | `entityNamePlural`, `recordId`, `navigationProperty`, `relatedEntityNamePlural`, `relatedRecordId` | |
+| 🆕 `disassociate-records` | Délier deux enregistrements | `entityNamePlural`, `recordId`, `navigationProperty` | `relatedRecordId` |
 
-| Tool | Description | Required Params | Optional |
-|------|-------------|-----------------|----------|
-| `get-flows` | List cloud flows (smart filtering) | | `activeOnly`, `maxRecords`, `nameContains`, `excludeSystem`, `excludeCustomerInsights`, `excludeCopilotSales` |
-| `search-workflows` | Search workflows and flows | | `name`, `primaryEntity`, `description`, `category`, `statecode`, `includeDescription`, `maxResults` |
-| `get-flow-definition` | Full definition or parsed summary | `flowId` | `summary` |
-| `get-flow-runs` | Flow run history | `flowId` | `status`, `startedAfter`, `startedBefore`, `maxRecords` |
-| `get-flow-run-details` | Run details with action-level errors | `flowId`, `runId` | |
-| `cancel-flow-run` | Cancel a running/waiting run | `flowId`, `runId` | |
-| `resubmit-flow-run` | Retry a failed run | `flowId`, `runId` | |
-| `scan-flow-health` | Batch health scan (success rates) | | `daysBack`, `maxRunsPerFlow`, `maxFlows`, `activeOnly` |
-| `get-flow-inventory` | Lightweight flow inventory | | `maxRecords` |
+### Formulaires & Vues
 
-#### Solutions
+| Outil | Description | Paramètres requis | Optionnels |
+|---|---|---|---|
+| 🆕 `get-entity-forms` | Lister les formulaires d'une entité | `entityLogicalName` | `type` (2=Main, 5=QuickView, 6=QuickCreate, 7=Dashboard) |
+| 🆕 `get-form-fields` | Champs présents sur un formulaire | `formId` | |
+| 🆕 `add-form-field` | Ajouter un champ en bas de la 1re section | `entityLogicalName`, `formId`, `attributeName` | |
+| 🆕 `add-form-field-relative` | Ajouter un champ avant/après un champ existant | `entityLogicalName`, `formId`, `attributeName`, `relativeToField`, `position` (`before`/`after`) | |
+| 🆕 `remove-form-field` | Retirer un champ d'un formulaire | `entityLogicalName`, `formId`, `attributeName` | |
+| 🆕 `add-form-library` | Inscrire une web resource JS dans `<formLibraries>` | `entityLogicalName`, `formId`, `libraryName` | |
+| 🆕 `remove-form-library` | Désinscrire une library (refuse si handlers la référencent, sauf `force=true`) | `entityLogicalName`, `formId`, `libraryName` | `force` |
+| 🆕 `add-form-event-handler` | Attacher un handler JS (onload/onsave/onchange) | `entityLogicalName`, `formId`, `eventName`, `functionName`, `libraryName` | `attributeName` (requis pour onchange), `passExecutionContext`, `parameters` |
+| 🆕 `remove-form-event-handler` | Retirer un handler par `functionName` | `entityLogicalName`, `formId`, `functionName` | `libraryName` |
+| 🆕 `add-form-pcf-control` | Attacher un PCF custom à un champ | `entityLogicalName`, `formId`, `attributeName`, `pcfControlName` | `formFactors`, `customParameters` |
+| 🆕 `remove-form-pcf-control` | Détacher le PCF (revient au contrôle standard) | `entityLogicalName`, `formId`, `attributeName` | |
+| 🆕 `get-entity-views` | Lister les vues d'une entité | `entityLogicalName` | |
+| 🆕 `get-view-columns` | Colonnes d'une vue | `viewId` | |
+| 🆕 `add-view-column` | Ajouter une colonne (en fin) | `entityLogicalName`, `viewId`, `attributeName` | `width` |
+| 🆕 `add-view-column-relative` | Ajouter une colonne avant/après une autre | `entityLogicalName`, `viewId`, `attributeName`, `relativeToField`, `position` | `width` |
+| 🆕 `remove-view-column` | Retirer une colonne (refuse si c'est la dernière) | `entityLogicalName`, `viewId`, `attributeName` | |
+| 🆕 `set-view-columns` | Remplacer le set complet de colonnes (préserve filtres) | `entityLogicalName`, `viewId`, `columns` | `orderBy`, `orderDescending` |
 
-| Tool | Description | Required Params | Optional |
-|------|-------------|-----------------|----------|
-| `get-publishers` | List non-readonly publishers | | |
-| `get-solutions` | List visible solutions | | |
-| `get-solution` | Get solution by unique name | `uniqueName` | |
-| `get-solution-components` | List components in a solution | `solutionUniqueName` | |
-| `export-solution` | Export solution (base64) | `solutionName` | `managed` |
-| `add-solution-component` | Add a component to a solution | `solutionUniqueName`, `componentId`, `componentType` | `addRequiredComponents` |
-| `publish-customizations` | Publish entity or all customizations | | `entityLogicalName` |
+### Plugins
 
-#### Workflows (Classic)
+| Outil | Description | Paramètres requis | Optionnels |
+|---|---|---|---|
+| `get-plugin-assemblies` | Liste des assemblies | | `includeManaged`, `maxRecords` |
+| `get-plugin-assembly-complete` | Assembly + types + steps + images | `assemblyName` | `includeDisabled` |
+| `get-entity-plugin-pipeline` | Plugins exécutés sur une entité | `entityName` | `messageFilter`, `includeDisabled` |
+| `get-plugin-trace-logs` | Trace logs (debug runtime) | | `entityName`, `messageName`, `correlationId`, `pluginStepId`, `exceptionOnly`, `hoursBack`, `maxRecords` |
+| `get-all-plugin-steps` | Tous les SDK message processing steps | | `includeDisabled`, `maxRecords` |
+| `get-plugin-type` | Lookup d'un plugin type par nom de classe | `typeName` | |
+| `get-sdk-message` | Lookup d'un SDK message par nom | `messageName` | |
+| 🆕 `get-plugin-packages` | Lister les plugin packages (.nupkg) | | `includeManaged`, `maxRecords` |
+| 🆕 `register-plugin-package` | Enregistrer un nouveau package .nupkg (base64) | `name`, `uniqueName`, `version`, `content` | `solutionName` |
+| 🆕 `update-plugin-package` | Mettre à jour un package existant | `pluginPackageId`, `content` | `version` |
+| 🆕 `register-plugin-assembly` | Enregistrer une assembly .dll traditionnelle (base64) | `name`, `content`, `version` | `isolationMode`, `description`, `solutionName` |
+| `create-plugin-step` | Enregistrer un step | `name`, `pluginTypeId`, `sdkMessageId`, `stage`, `mode` | `rank`, `supportedDeployment`, `description`, `configuration`, `sdkMessageFilterId`, `solutionName` |
+| 🆕 `create-plugin-step-image` | Enregistrer une PreImage/PostImage sur un step | `stepId` | `name`, `entityAlias`, `imageType`, `messagePropertyName`, `attributes` |
+| 🆕 `enable-plugin-step` | Activer un step | `stepId` | |
+| 🆕 `disable-plugin-step` | Désactiver un step | `stepId` | |
+| 🆕 `delete-plugin-step` | Supprimer un step (cascade sur ses images) | `stepId` | |
 
-| Tool | Description | Required Params | Optional |
-|------|-------------|-----------------|----------|
-| `get-workflows` | List classic workflows | | `activeOnly`, `maxRecords` |
-| `get-workflow-definition` | XAML definition or summary | `workflowId` | `summary` |
-| `get-ootb-workflows` | Background, BPFs, actions, on-demand | | `maxRecords`, `categories` |
+### Solutions
 
-#### Business Rules
+| Outil | Description | Paramètres requis | Optionnels |
+|---|---|---|---|
+| `get-publishers` | Publishers non-readonly | | |
+| `get-solutions` | Solutions visibles | | |
+| `get-solution` | Solution par unique name | `uniqueName` | |
+| `get-solution-components` | Composants d'une solution | `solutionUniqueName` | |
+| 🆕 `create-solution` | Créer une nouvelle solution unmanaged | `uniqueName`, `friendlyName`, `publisherUniqueName` | `version`, `description` |
+| 🆕 `update-solution-version` | Bump de version (releases) | `uniqueName`, `version` | |
+| `add-solution-component` | Ajouter un composant à une solution | `solutionUniqueName`, `componentId`, `componentType` | `addRequiredComponents` |
+| `export-solution` | Exporter une solution (base64) | `solutionName` | `managed` |
+| `publish-customizations` | Publier les customizations | | `entityLogicalName` |
 
-| Tool | Description | Required Params | Optional |
-|------|-------------|-----------------|----------|
-| `get-business-rules` | List business rules | | `activeOnly`, `maxRecords` |
-| `get-business-rule` | Business rule with XAML | `workflowId` | |
+### Flows (Power Automate)
 
-#### Option Sets
+| Outil | Description | Paramètres requis | Optionnels |
+|---|---|---|---|
+| `get-flows` | Lister les cloud flows (filtrage smart) | | `activeOnly`, `maxRecords`, `nameContains`, `excludeSystem`, `excludeCustomerInsights`, `excludeCopilotSales` |
+| `search-workflows` | Recherche workflows + flows | | `name`, `primaryEntity`, `description`, `category`, `statecode`, `includeDescription`, `maxResults` |
+| `get-flow-definition` | Définition complète ou résumé | `flowId` | `summary` |
+| `get-flow-runs` | Historique des runs | `flowId` | `status`, `startedAfter`, `startedBefore`, `maxRecords` |
+| `get-flow-run-details` | Détail d'un run avec erreurs par action | `flowId`, `runId` | |
+| `cancel-flow-run` | Annuler un run en cours | `flowId`, `runId` | |
+| `resubmit-flow-run` | Relancer un run échoué | `flowId`, `runId` | |
+| `scan-flow-health` | Scan global (taux de succès) | | `daysBack`, `maxRunsPerFlow`, `maxFlows`, `activeOnly` |
+| `get-flow-inventory` | Inventaire léger | | `maxRecords` |
+| 🆕 `create-cloud-flow` | Créer un cloud flow en Draft | `name`, `clientData` | `primaryEntity`, `solutionName` |
+| 🆕 `set-flow-state` | Activer/désactiver un cloud flow | `flowId`, `activate` | |
 
-| Tool | Description | Required Params |
-|------|-------------|-----------------|
-| `get-global-option-set` | Get a global option set definition | `optionSetName` |
+### Workflows classiques + Business Rules
 
-#### Configuration
+| Outil | Description | Paramètres requis | Optionnels |
+|---|---|---|---|
+| `get-workflows` | Workflows classiques | | `activeOnly`, `maxRecords` |
+| `get-workflow-definition` | Définition XAML ou résumé | `workflowId` | `summary` |
+| `get-ootb-workflows` | Workflows out-of-the-box (background, BPF, actions, on-demand) | | `maxRecords`, `categories` |
+| `get-business-rules` | Business rules | | `activeOnly`, `maxRecords` |
+| `get-business-rule` | Business rule + XAML | `workflowId` | |
 
-| Tool | Description | Required Params | Optional |
-|------|-------------|-----------------|----------|
+### Web Resources
+
+| Outil | Description | Paramètres requis | Optionnels |
+|---|---|---|---|
+| `get-web-resources` | Lister les web resources | | `maxRecords`, `webResourceType`, `nameFilter` |
+| `get-web-resource` | Web resource par nom | `name` | |
+| `create-web-resource` | Créer une web resource | `name`, `displayName`, `webResourceType`, `content` | `description`, `solutionName` |
+| 🆕 `update-web-resource` | Mettre à jour le contenu d'une web resource existante | `webResourceId`, `content` | `solutionName` |
+| 🆕 `upsert-web-resource` | Créer ou mettre à jour (idempotent par nom) | `name`, `displayName`, `webResourceType`, `content` | `description`, `solutionName` |
+| 🆕 `delete-web-resource` | Supprimer une web resource (irréversible) | `webResourceId` | |
+
+### Configuration (env vars + connection refs)
+
+| Outil | Description | Paramètres requis | Optionnels |
+|---|---|---|---|
 | `get-connection-references` | Connection references | | `maxRecords`, `managedOnly`, `hasConnection`, `inactive` |
-| `get-environment-variables` | Environment variable definitions + values | | `maxRecords`, `managedOnly` |
-| `create-environment-variable` | Create an environment variable definition | `schemaName`, `displayName`, `type` | `defaultValue`, `description`, `solutionName` |
-| `set-environment-variable-value` | Set or update an environment variable value | `definitionId`, `value` | `existingValueId` |
+| 🆕 `create-connection-reference` | Créer une connection reference | `logicalName`, `displayName`, `connectorId` | `description`, `solutionName` |
+| `get-environment-variables` | Definitions + valeurs courantes | | `maxRecords`, `managedOnly` |
+| `create-environment-variable` | Créer une env var | `schemaName`, `displayName`, `type` | `defaultValue`, `description`, `solutionName` |
+| `set-environment-variable-value` | Set ou update d'une valeur | `definitionId`, `value` | `existingValueId` |
 
-#### Custom APIs
+### Custom APIs
 
-| Tool | Description | Required Params | Optional |
-|------|-------------|-----------------|----------|
-| `get-custom-apis` | List Custom API definitions | | `maxRecords`, `includeManaged` |
-| `get-custom-api` | Get a Custom API by unique name | `uniqueName` | |
-| `create-custom-api` | Create a Custom API definition | `uniqueName`, `name`, `displayName`, `bindingType`, `isFunction`, `isPrivate`, `allowedCustomProcessingStepType` | `description`, `pluginTypeId`, `pluginTypeName`, `boundEntityLogicalName`, `solutionName` |
-| `get-custom-api-response-properties` | List response properties | `customApiId` | |
-| `create-custom-api-response-property` | Create a response property | `customApiId`, `uniqueName`, `name`, `displayName`, `type` | `description`, `logicalEntityName`, `isOptional`, `solutionName` |
-| `get-custom-api-request-parameters` | List request parameters | `customApiId` | |
-| `create-custom-api-request-parameter` | Create a request parameter | `customApiId`, `uniqueName`, `name`, `displayName`, `type` | `description`, `logicalEntityName`, `isOptional`, `solutionName` |
+| Outil | Description | Paramètres requis | Optionnels |
+|---|---|---|---|
+| `get-custom-apis` | Lister les Custom APIs | | `maxRecords`, `includeManaged` |
+| `get-custom-api` | Custom API par unique name | `uniqueName` | |
+| `create-custom-api` | Créer une Custom API | `uniqueName`, `name`, `displayName`, `bindingType`, `isFunction`, `isPrivate`, `allowedCustomProcessingStepType` | `description`, `pluginTypeId`, `pluginTypeName`, `boundEntityLogicalName`, `solutionName` |
+| `get-custom-api-response-properties` | Lister les response properties | `customApiId` | |
+| `create-custom-api-response-property` | Créer une response property | `customApiId`, `uniqueName`, `name`, `displayName`, `type` | `description`, `logicalEntityName`, `isOptional`, `solutionName` |
+| `get-custom-api-request-parameters` | Lister les request parameters | `customApiId` | |
+| `create-custom-api-request-parameter` | Créer une request parameter | `customApiId`, `uniqueName`, `name`, `displayName`, `type` | `description`, `logicalEntityName`, `isOptional`, `solutionName` |
 
-#### Web Resources
+### Security Roles
 
-| Tool | Description | Required Params | Optional |
-|------|-------------|-----------------|----------|
-| `get-web-resources` | List web resources | | `maxRecords`, `webResourceType`, `nameFilter` |
-| `get-web-resource` | Get a web resource by name | `name` | |
-| `create-web-resource` | Upload a new web resource | `name`, `displayName`, `webResourceType`, `content` | `description`, `solutionName` |
+| Outil | Description | Paramètres requis | Optionnels |
+|---|---|---|---|
+| `get-security-roles` | Roles customizables | | `solutionUniqueName`, `excludeSystemRoles`, `includePrivileges`, `maxRecords` |
+| `get-security-role-privileges` | Privilèges d'un role | `roleId` | `entityFilter`, `accessRightFilter` |
+| 🆕 `get-security-roles-by-solution` | Roles inclus dans une solution donnée | `solutionUniqueName` | `includePrivileges` |
 
-#### Security Roles
+### Dépendances et Service Endpoints
 
-| Tool | Description | Required Params | Optional |
-|------|-------------|-----------------|----------|
-| `get-security-roles` | List customizable security roles | | `solutionUniqueName`, `excludeSystemRoles`, `includePrivileges`, `maxRecords` |
-| `get-security-role-privileges` | Privileges for a role | `roleId` | `entityFilter`, `accessRightFilter` |
+| Outil | Description | Paramètres requis | Optionnels |
+|---|---|---|---|
+| `check-component-dependencies` | Dépendances bloquant la suppression | `componentId`, `componentType` | |
+| `check-delete-eligibility` | Vérifier qu'un composant peut être supprimé | `componentId`, `componentType` | |
+| `get-service-endpoints` | Service Bus, webhooks, Event Hub, Event Grid | | `maxRecords` |
 
-#### Dependencies
+---
 
-| Tool | Description | Required Params |
-|------|-------------|-----------------|
-| `check-component-dependencies` | Dependencies blocking deletion | `componentId`, `componentType` |
-| `check-delete-eligibility` | Check if a component can be deleted | `componentId`, `componentType` |
+## Prompts MCP
 
-#### Service Endpoints
-
-| Tool | Description | Optional |
-|------|-------------|----------|
-| `get-service-endpoints` | Service Bus, webhooks, Event Hub, Event Grid | `maxRecords` |
-
-### MCP Prompts
-
-| Prompt | Description | Required Args |
-|--------|-------------|---------------|
-| `entity-overview` | Entity overview with key attributes and relationships | `entityName` |
-| `attribute-details` | Detailed attribute info (type, format, requirements) | `entityName`, `attributeName` |
-| `query-template` | OData query template with example filters | `entityName` |
-| `relationship-map` | Complete 1:N and N:N relationship map | `entityName` |
+| Prompt | Description | Args requis |
+|---|---|---|
+| `entity-overview` | Vue d'ensemble d'une entité (attributs clés + relations) | `entityName` |
+| `attribute-details` | Détails d'un attribut (type, format, contraintes) | `entityName`, `attributeName` |
+| `query-template` | Template de requête OData avec filtres d'exemple | `entityName` |
+| `relationship-map` | Carte complète des relations 1:N et N:N | `entityName` |
 
 ---
 
 ## CLI
 
-Same tools as the MCP server, but results are cached to the file system for full-fidelity output on large data sets.
+Mêmes outils que le serveur MCP, mais les résultats sont mis en cache sur le système de fichiers — utile sur des environnements avec beaucoup d'entités/flows/steps qui satureraient le contexte d'un client IA.
 
-### Global Option
+### Option globale
 
-`--env <name>` — target environment (defaults to first configured).
+`--env <name>` — environnement cible (défaut : premier configuré).
 
-### Commands
+### Commandes principales (extrait)
 
-#### Entity
-```
+```bash
+# Entité
 entity-metadata <entityName>
 entity-attributes <entityName>
-entity-attribute <entityName> <attributeName>
-entity-relationships <entityName>
-entity-keys <entityName>
-create-entity <schemaName> <displayName> <displayCollectionName>  [--primary-name-schema <name>] [--primary-name-display <name>] [--description <desc>] [--ownership <UserOwned|OrganizationOwned>] [--has-activities] [--has-notes] [--solution <name>]
-create-entity-string-attribute <entityName> <schemaName> <displayName>  [--max-length <n>] [--required-level <level>] [--description <desc>] [--solution <name>]
-create-entity-memo-attribute <entityName> <schemaName> <displayName>  [--max-length <n>] [--required-level <level>] [--description <desc>] [--solution <name>]
-create-entity-integer-attribute <entityName> <schemaName> <displayName>  [--min <n>] [--max <n>] [--required-level <level>] [--description <desc>] [--solution <name>]
-create-entity-decimal-attribute <entityName> <schemaName> <displayName>  [--precision <n>] [--min <n>] [--max <n>] [--required-level <level>] [--description <desc>] [--solution <name>]
-create-entity-money-attribute <entityName> <schemaName> <displayName>  [--precision-source <0|1|2>] [--precision <n>] [--min <n>] [--max <n>] [--required-level <level>] [--description <desc>] [--solution <name>]
-create-entity-boolean-attribute <entityName> <schemaName> <displayName>  [--true-label <label>] [--false-label <label>] [--default-value <true|false>] [--required-level <level>] [--description <desc>] [--solution <name>]
-create-entity-datetime-attribute <entityName> <schemaName> <displayName>  [--format <DateOnly|DateAndTime>] [--behavior <UserLocal|DateOnly|TimeZoneIndependent>] [--required-level <level>] [--description <desc>] [--solution <name>]
-create-entity-picklist-attribute <entityName> <schemaName> <displayName>  [-o <value:label>]... [--required-level <level>] [--description <desc>] [--solution <name>]
-create-entity-lookup <referencingEntity> <referencedEntity> <relationshipSchemaName> <lookupSchemaName> <displayName>  [--required-level <level>] [--description <desc>] [--cascade-delete <NoCascade|RemoveLink|Restrict|Cascade>] [--solution <name>]
-create-entity-alternate-key <entityName> <schemaName> <displayName> <keyAttributes...>  [--solution <name>]
+create-entity <schemaName> <displayName> <displayCollectionName> [--ownership ...] [--solution ...]
+create-entity-string-attribute <entityName> <schemaName> <displayName> [--max-length ...]
+create-entity-picklist-attribute <entityName> <schemaName> <displayName> -o 1:Haute -o 2:Moyenne
+create-entity-lookup <referencing> <referenced> <relSchema> <lookupSchema> <displayName>
 delete-entity-attribute <entityName> <attributeName>
-```
 
-#### Records
-```
-record <entityNamePlural> <recordId>
-query-records <entityNamePlural> <filter>  [--max <n>]
+# Records
 create-record <entityNamePlural> <jsonBody>
 update-record <entityNamePlural> <recordId> <jsonBody>
 delete-record <entityNamePlural> <recordId>
-associate-records <entityNamePlural> <recordId> <navigationProperty> <relatedEntityNamePlural> <relatedRecordId>
-disassociate-records <entityNamePlural> <recordId> <navigationProperty> [relatedRecordId]
-```
 
-#### Plugins
-```
-plugin-assemblies                          [--include-managed] [--max <n>]
-plugin-assembly <assemblyName>             [--include-disabled]
-plugin-packages                            [--include-managed] [--max <n>]
-plugin-type <typeName>
-entity-pipeline <entityName>               [--message <msg>] [--include-disabled]
-plugin-trace-logs                          [--entity <name>] [--message <msg>] [--correlation-id <id>] [--step-id <id>] [--hours <n>] [--max <n>] [--exceptions-only]
-all-plugin-steps                           [--include-disabled] [--max <n>]
-sdk-message <messageName>
-register-plugin-package <filePath>         [--pkg-version <version>] [--solution <name>]
-update-plugin-package <filePath>           --plugin-package-id <id> [--pkg-version <version>]
-create-plugin-step <name> <pluginTypeId> <sdkMessageId>  [--stage <n>] [--mode <n>] [--rank <n>] [--supported-deployment <n>] [--description <desc>] [--configuration <cfg>] [--message-filter-id <id>] [--solution <name>]
-create-plugin-step-image <stepId>          [--name <name>] [--entity-alias <alias>] [--image-type <0|1|2>] [--message-property-name <name>] [--attributes <csv>]
-```
-
-#### Flows
-```
-flows                                      [--active] [--name <contains>] [--include-managed] [--max <n>]
-flow-definition <flowId>                   [--summary]
-flow-inventory                             [--max <n>]
-flow-runs <flowId>                         [--status <s>] [--after <iso>] [--before <iso>] [--max <n>]
-flow-run-details <flowId> <runId>
-flow-health                                [--days <n>] [--max-runs <n>] [--max-flows <n>] [--active]
-search-workflows                           [--name <name>] [--entity <entity>] [--category <n>] [--active] [--max <n>]
-create-cloud-flow <clientDataFile>         [--primary-entity <entity>] [--solution <name>]
+# Flows
+create-cloud-flow <clientDataFile> [--solution ...]
 activate-flow <flowId>
 deactivate-flow <flowId>
-```
 
-#### Solutions
-```
-solutions
-solution <uniqueName>
-solution-components <uniqueName>
-publishers
-add-solution-component <solutionUniqueName> <componentId> <componentType>  [--add-required]
-publish-customizations                     [--entity <logicalName>]
-```
+# Web resources
+create-web-resource <name> <displayName> <filePath> [--type 3] [--solution ...]
+set-entity-icon <entityName> <svgFilePath> [--solution ...]
 
-#### Workflows
-```
-workflows                                  [--active] [--max <n>]
-workflow-definition <workflowId>           [--summary]
-ootb-workflows                             [--categories <0,1,2,3,4>]
-```
-
-#### Business Rules
-```
-business-rules                             [--active] [--max <n>]
-business-rule <workflowId>
-```
-
-#### Option Sets
-```
-optionset <optionSetName>
-```
-
-#### Dependencies
-```
-check-dependencies <componentId> <componentType>
-```
-
-#### Configuration
-```
-connection-references                      [--managed-only] [--has-connection] [--no-connection] [--inactive] [--max-records <n>]
-create-connection-reference <logicalName> <displayName> <connectorId>  [--description <desc>] [--solution <name>]
-environment-variables                      [--managed-only] [--max-records <n>]
-create-environment-variable <schemaName> <displayName>  [--type <type>] [--default-value <val>] [--description <desc>] [--solution <name>]
-set-environment-variable-value <definitionId> <value>   [--existing-value-id <id>]
-```
-
-#### Custom APIs
-```
-custom-apis                                [--include-managed] [--max <n>]
-custom-api <uniqueName>
-create-custom-api <uniqueName> <displayName>  [--binding-type <n>] [--bound-entity <name>] [--is-function] [--is-private] [--processing-type <n>] [--plugin-type-id <id>] [--plugin-type-name <name>] [--description <desc>] [--solution <name>]
-custom-api-response-properties <customApiId>
-create-custom-api-response-property <customApiId> <uniqueName> <displayName>  [--type <n>] [--description <desc>] [--solution <name>]
-custom-api-request-parameters <customApiId>
-create-custom-api-request-parameter <customApiId> <uniqueName> <displayName>  [--type <n>] [--description <desc>] [--optional] [--solution <name>]
-```
-
-#### Web Resources
-```
-web-resources                              [--type <n>] [--name <contains>] [--max <n>]
-web-resource <name>
-create-web-resource <name> <displayName> <filePath>  [--type <n>] [--description <desc>] [--solution <name>]
-set-entity-icon <entityName> <svgFilePath>  [--solution <name>] [--web-resource-name <name>] [--display-name <name>] [--no-publish]
-```
-
-#### Forms & Views
-```
-entity-forms <entityName>                  [--type <n>]
-entity-form-fields <formId>
+# Formulaires & vues
 add-form-field <entityName> <formId> <attributeName>
 remove-form-field <entityName> <formId> <attributeName>
-entity-views <entityName>
-add-view-column <entityName> <viewId> <attributeName>   [--width <n>]
-set-view-columns <entityName> <viewId> <columns...>     [--order-by <attr>] [--desc]
-remove-view-column <entityName> <viewId> <attributeName>
+add-view-column <entityName> <viewId> <attributeName> [--width 150]
+set-view-columns <entityName> <viewId> col1:120 col2:200 [--order-by ...]
+
+# PAC
+pac-auth                                   # Authentifie pac CLI avec les credentials
+generate-models <outdir>                   # Early-bound depuis le schéma
+deploy-plugin <pluginFile> --plugin-id <id>
 ```
 
-#### PAC Integration
-```
-pac-auth                                   Authenticate pac CLI using environment credentials
-generate-models <outdirectory>             [--settings <path>] [--entities <filter>] [--namespace <ns>]
-deploy-plugin <pluginFile>                 --plugin-id <id> [--type <Nuget|Assembly>] [--configuration <config>]
-```
-
-#### Security Roles
-```
-security-roles                             [--solution <name>] [--include-system] [--include-privileges] [--max-records <n>]
-security-role-privileges <roleId>          [--entity <name>] [--access-right <type>]
-```
-
-#### Service Endpoints
-```
-service-endpoints                          [--max <n>]
-```
+La liste complète est dans `src/cli/commands/` (un fichier par domaine).
 
 ---
 
-## Development
+## Développement
 
 ```bash
-git clone https://github.com/michsob/powerplatform-mcp.git
+git clone https://github.com/tomthemod/powerplatform-mcp.git
 cd powerplatform-mcp
 npm install
-cp .env.example .env   # fill in credentials
+cp .env.example .env   # remplir les credentials
 npm run build
-npm run inspector      # test with MCP Inspector
+npm run inspector      # tester avec MCP Inspector
 ```
 
-## Releasing
+### Workflow de modification
 
-To publish a new version:
+Pour ajouter un nouvel outil :
 
-1. Update `version` in `package.json`
-2. Commit the change to `main`
-3. Create and push a version tag:
-   ```bash
-   git tag v1.0.2
-   git push origin v1.0.2
-   ```
+1. Ajouter la méthode au service concerné dans `src/services/<domaine>-service.ts`.
+2. Ajouter le `server.registerTool(...)` correspondant dans `src/tools/<domaine>-tools.ts`.
+3. Si c'est un nouveau domaine : créer aussi `src/services/<domaine>-service.ts` + `src/tools/<domaine>-tools.ts` + brancher dans `src/tools/index.ts` et `src/services/index.ts`.
+4. `npm run build` pour vérifier le typage.
+5. Mettre à jour ce README.
 
-GitHub Actions will automatically publish:
+### Scripts batch (Windows) — workflow rapide
 
-| Package | npm | GitHub Packages | Docker (GHCR) |
-|---------|-----|-----------------|---------------|
-| MCP Server | `npm i powerplatform-mcp` | `npm i @michsob/powerplatform-mcp` | `ghcr.io/michsob/powerplatform-mcp` |
-| CLI | `npm i powerplatform-cli` | `npm i @michsob/powerplatform-cli` | `ghcr.io/michsob/powerplatform-cli` |
+Disponibles dans le dossier parent (`C:\Work\Sources\`) :
 
-npm publishing uses [Trusted Publishing (OIDC)](https://docs.npmjs.com/trusted-publishers/) — no tokens or secrets needed. GitHub Packages and GHCR use the built-in `GITHUB_TOKEN` automatically.
+- `powerplatform-mcp-commit-push.bat ["message"]` — commit + build + push origin
+- `powerplatform-mcp-sync-upstream.bat` — fetch + merge `michsob/main` + build + push fork
+
+---
+
+## Comparaison avec le package amont
+
+Pour reprendre les évolutions du repo amont :
+
+```bash
+git fetch upstream
+git merge upstream/main
+npm install && npm run build
+```
+
+Les conflits sont rares parce que le fork ne fait qu'**ajouter** des `registerTool(...)` et de nouveaux fichiers — il ne modifie pratiquement aucun service ou outil existant (à part `createPicklistAttribute` étendu pour accepter `globalOptionSetName`).
+
+---
 
 ## License
 
-MIT
+MIT — héritée du projet amont.
 
-<a href="https://glama.ai/mcp/servers/@michsob/powerplatform-mcp">
-  <img width="380" height="200" src="https://glama.ai/mcp/servers/@michsob/powerplatform-mcp/badge" alt="PowerPlatform MCP server" />
-</a>
-
-[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/michsob-powerplatform-mcp-badge.png)](https://mseep.ai/app/michsob-powerplatform-mcp)
+Crédits : projet d'origine [michsob/powerplatform-mcp](https://github.com/michsob/powerplatform-mcp).

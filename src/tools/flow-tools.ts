@@ -461,4 +461,69 @@ export function registerFlowTools(server: McpServer, registry: EnvironmentRegist
       }
     }
   );
+
+  // Create Cloud Flow
+  server.registerTool(
+    "create-cloud-flow",
+    {
+      title: "Create Cloud Flow",
+      description: "Create a modern Cloud Flow (workflow with category=5) in Draft state. clientData must be a JSON string with top-level schemaVersion + properties keys.",
+      inputSchema: {
+        name: z.string().describe("Flow name"),
+        clientData: z.string().describe("JSON string of the flow body, with top-level { schemaVersion, properties }"),
+        primaryEntity: z.string().optional().describe("Primary entity logical name (default: 'none')"),
+        solutionName: z.string().optional(),
+        environment: z.string().optional(),
+      },
+      outputSchema: z.object({ flowId: z.string(), name: z.string() }),
+    },
+    async ({ name, clientData, primaryEntity, solutionName, environment }) => {
+      try {
+        const ctx = registry.getContext(environment);
+        const service = ctx.getFlowService();
+        const result = await service.createCloudFlow({ name, clientData, primaryEntity, solutionName });
+        return {
+          structuredContent: { flowId: result.flowId, name: result.name },
+          content: [{ type: "text", text: `Created cloud flow '${name}' (ID: ${result.flowId}). Activate it via set-flow-state once connection refs are bound.` }],
+        };
+      } catch (error: any) {
+        console.error("Error creating cloud flow:", error);
+        return { content: [{ type: "text", text: `Failed to create cloud flow: ${error.message}` }] };
+      }
+    }
+  );
+
+  // Set Flow State (activate / deactivate)
+  server.registerTool(
+    "set-flow-state",
+    {
+      title: "Set Flow State",
+      description: "Activate or deactivate a Cloud Flow. NOTE: activation may fail with ConnectionAuthorizationFailed if the calling principal does not own the bound connections.",
+      inputSchema: {
+        flowId: z.string(),
+        activate: z.boolean().describe("true = activate, false = deactivate"),
+        environment: z.string().optional(),
+      },
+      outputSchema: z.object({
+        success: z.boolean(),
+        flowId: z.string(),
+        previousState: z.string(),
+        newState: z.string(),
+      }),
+    },
+    async ({ flowId, activate, environment }) => {
+      try {
+        const ctx = registry.getContext(environment);
+        const service = ctx.getFlowService();
+        const result = await service.setFlowState(flowId, activate);
+        return {
+          structuredContent: result,
+          content: [{ type: "text", text: `Flow ${flowId}: ${result.previousState} → ${result.newState}` }],
+        };
+      } catch (error: any) {
+        console.error("Error setting flow state:", error);
+        return { content: [{ type: "text", text: `Failed to set flow state: ${error.message}` }] };
+      }
+    }
+  );
 }

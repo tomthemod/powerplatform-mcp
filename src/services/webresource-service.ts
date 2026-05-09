@@ -109,6 +109,15 @@ export class WebResourceService {
   }
 
   /**
+   * Delete a web resource by id. Irreversible.
+   * Caller should run check-component-dependencies first if the web resource is referenced
+   * by forms / ribbons / sitemap (Dataverse will refuse the delete otherwise).
+   */
+  async deleteWebResource(webResourceId: string): Promise<void> {
+    await this.client.delete(`api/data/v9.2/webresourceset(${webResourceId})`);
+  }
+
+  /**
    * Create a new web resource, or update the content of an existing one with the
    * same name. Returns the web resource id either way. Idempotent across re-runs.
    */

@@ -288,6 +288,480 @@ export function registerEntityTools(server: McpServer, registry: EnvironmentRegi
     }
   );
 
+  // Create Entity (Table)
+  server.registerTool(
+    "create-entity",
+    {
+      title: "Create Entity (Table)",
+      description: "Create a new custom Dataverse table with a primary name attribute. Add additional columns afterwards via the create-entity-* tools.",
+      inputSchema: {
+        schemaName: z.string().describe("Schema name (must start with publisher prefix, e.g. 'new_FinancialLine')"),
+        displayName: z.string().describe("Singular display name (e.g. 'Financial Line')"),
+        displayCollectionName: z.string().describe("Plural display name (e.g. 'Financial Lines')"),
+        primaryNameSchemaName: z.string().describe("Schema name for the primary name attribute (e.g. 'new_Name')"),
+        primaryNameDisplayName: z.string().describe("Display name for the primary name attribute (e.g. 'Name')"),
+        description: z.string().optional().describe("Optional description for the entity"),
+        ownershipType: z.enum(["UserOwned", "OrganizationOwned"]).optional().describe("Ownership type (default: UserOwned)"),
+        hasActivities: z.boolean().optional().describe("Track activities (default: false)"),
+        hasNotes: z.boolean().optional().describe("Support notes (default: false)"),
+        languageCode: z.number().optional().describe("Language code for labels (default: 1045)"),
+        solutionName: z.string().optional().describe("Solution unique name to add the entity to"),
+        environment: z.string().optional().describe("Environment name (e.g. DEV, UAT). Uses default if omitted."),
+      },
+      outputSchema: z.object({
+        schemaName: z.string(),
+        entityId: z.string(),
+      }),
+    },
+    async ({ schemaName, displayName, displayCollectionName, primaryNameSchemaName, primaryNameDisplayName, description, ownershipType, hasActivities, hasNotes, languageCode, solutionName, environment }) => {
+      try {
+        const ctx = registry.getContext(environment);
+        const service = ctx.getEntityService();
+        const result = await service.createEntity(
+          schemaName, displayName, displayCollectionName,
+          primaryNameSchemaName, primaryNameDisplayName,
+          description, ownershipType ?? 'UserOwned',
+          hasActivities ?? false, hasNotes ?? false,
+          languageCode ?? 1045, solutionName,
+        );
+        return {
+          structuredContent: { schemaName, entityId: result.entityId },
+          content: [{ type: "text", text: `Created entity '${schemaName}' (ID: ${result.entityId})` }],
+        };
+      } catch (error: any) {
+        console.error("Error creating entity:", error);
+        return { content: [{ type: "text", text: `Failed to create entity: ${error.message}` }] };
+      }
+    }
+  );
+
+  // Set Entity Icon Vector
+  server.registerTool(
+    "set-entity-icon-vector",
+    {
+      title: "Set Entity Icon Vector",
+      description: "Set the SVG vector icon used in the unified-interface app navigation. The web resource must already exist (type 11=Vector).",
+      inputSchema: {
+        entityName: z.string().describe("The logical name of the entity"),
+        iconVectorName: z.string().describe("Web resource name (e.g. 'new_property_icon.svg')"),
+        solutionName: z.string().optional().describe("Solution unique name to scope the change to"),
+        environment: z.string().optional().describe("Environment name (e.g. DEV, UAT). Uses default if omitted."),
+      },
+    },
+    async ({ entityName, iconVectorName, solutionName, environment }) => {
+      try {
+        const ctx = registry.getContext(environment);
+        const service = ctx.getEntityService();
+        await service.setEntityIconVector(entityName, iconVectorName, solutionName);
+        return { content: [{ type: "text", text: `Set icon vector '${iconVectorName}' on entity '${entityName}'` }] };
+      } catch (error: any) {
+        console.error("Error setting entity icon vector:", error);
+        return { content: [{ type: "text", text: `Failed to set entity icon vector: ${error.message}` }] };
+      }
+    }
+  );
+
+  // Create Picklist Attribute (local options OR link to global option set)
+  server.registerTool(
+    "create-entity-picklist-attribute",
+    {
+      title: "Create Entity Picklist (Choice) Attribute",
+      description: "Create a Choice / Option Set attribute on a Dataverse entity. Either pass `options` for a LOCAL picklist, or `globalOptionSetName` to link to an existing GLOBAL option set. Mutually exclusive.",
+      inputSchema: {
+        entityName: z.string().describe("The logical name of the entity"),
+        schemaName: z.string().describe("Schema name for the new attribute"),
+        displayName: z.string().describe("Display name"),
+        options: z.array(z.object({ value: z.number(), label: z.string() })).optional().describe("List of options for a LOCAL picklist. Omit when linking to a global."),
+        globalOptionSetName: z.string().optional().describe("Logical name of an existing global option set to link to. Mutually exclusive with `options`."),
+        requiredLevel: z.enum(["None", "ApplicationRequired", "SystemRequired"]).optional().describe("Required level (default: None)"),
+        description: z.string().optional(),
+        languageCode: z.number().optional().describe("Language code for labels (default: 1045)"),
+        solutionName: z.string().optional(),
+        environment: z.string().optional(),
+      },
+      outputSchema: z.object({
+        entityName: z.string(),
+        schemaName: z.string(),
+        attributeId: z.string(),
+      }),
+    },
+    async ({ entityName, schemaName, displayName, options, globalOptionSetName, requiredLevel, description, languageCode, solutionName, environment }) => {
+      try {
+        const ctx = registry.getContext(environment);
+        const service = ctx.getEntityService();
+        const result = await service.createPicklistAttribute(
+          entityName, schemaName, displayName, options,
+          requiredLevel ?? 'None', description,
+          languageCode ?? 1045, solutionName, globalOptionSetName,
+        );
+        const detail = globalOptionSetName ? `linked to global '${globalOptionSetName}'` : `with ${options?.length ?? 0} local options`;
+        return {
+          structuredContent: { entityName, schemaName, attributeId: result.attributeId },
+          content: [{ type: "text", text: `Created picklist attribute '${schemaName}' on entity '${entityName}' ${detail} (ID: ${result.attributeId})` }],
+        };
+      } catch (error: any) {
+        console.error("Error creating picklist attribute:", error);
+        return { content: [{ type: "text", text: `Failed to create picklist attribute: ${error.message}` }] };
+      }
+    }
+  );
+
+  // Create Many-to-Many Relationship
+  server.registerTool(
+    "create-entity-many-to-many-relationship",
+    {
+      title: "Create Entity Many-to-Many Relationship",
+      description: "Create an N:N relationship between two Dataverse entities. Dataverse auto-creates the intersect entity (or reuses an existing one).",
+      inputSchema: {
+        entity1LogicalName: z.string().describe("First entity logical name (e.g. 'contact')"),
+        entity2LogicalName: z.string().describe("Second entity logical name (e.g. 'new_property')"),
+        relationshipSchemaName: z.string().describe("Schema name of the N:N relationship (e.g. 'new_contact_property')"),
+        intersectEntitySchemaName: z.string().optional().describe("Schema name of the intersect entity (default: same as relationshipSchemaName)"),
+        entity1NavLabel: z.string().optional().describe("Display label of the related-entity menu shown on entity1 (default: collection name of entity2)"),
+        entity2NavLabel: z.string().optional().describe("Display label of the related-entity menu shown on entity2 (default: collection name of entity1)"),
+        languageCode: z.number().optional(),
+        solutionName: z.string().optional(),
+        environment: z.string().optional(),
+      },
+      outputSchema: z.object({ relationshipSchemaName: z.string(), relationshipId: z.string() }),
+    },
+    async ({ entity1LogicalName, entity2LogicalName, relationshipSchemaName, intersectEntitySchemaName, entity1NavLabel, entity2NavLabel, languageCode, solutionName, environment }) => {
+      try {
+        const ctx = registry.getContext(environment);
+        const service = ctx.getEntityService();
+        const result = await service.createManyToManyRelationship(
+          entity1LogicalName, entity2LogicalName, relationshipSchemaName,
+          intersectEntitySchemaName, entity1NavLabel, entity2NavLabel,
+          languageCode ?? 1045, solutionName,
+        );
+        return {
+          structuredContent: { relationshipSchemaName, relationshipId: result.relationshipId },
+          content: [{ type: "text", text: `Created N:N relationship '${relationshipSchemaName}' between '${entity1LogicalName}' and '${entity2LogicalName}' (ID: ${result.relationshipId})` }],
+        };
+      } catch (error: any) {
+        console.error("Error creating N:N relationship:", error);
+        return { content: [{ type: "text", text: `Failed to create N:N relationship: ${error.message}` }] };
+      }
+    }
+  );
+
+  // Delete Entity Attribute
+  server.registerTool(
+    "delete-entity-attribute",
+    {
+      title: "Delete Entity Attribute",
+      description: "Delete an attribute from an entity. IRREVERSIBLE — the column and all data in it are dropped. Fails if any component still depends on it.",
+      inputSchema: {
+        entityName: z.string().describe("The logical name of the entity"),
+        attributeName: z.string().describe("The logical name of the attribute to delete"),
+        environment: z.string().optional(),
+      },
+    },
+    async ({ entityName, attributeName, environment }) => {
+      try {
+        const ctx = registry.getContext(environment);
+        const service = ctx.getEntityService();
+        await service.deleteEntityAttribute(entityName, attributeName);
+        return { content: [{ type: "text", text: `Deleted attribute '${attributeName}' from entity '${entityName}'` }] };
+      } catch (error: any) {
+        console.error("Error deleting entity attribute:", error);
+        return { content: [{ type: "text", text: `Failed to delete entity attribute: ${error.message}` }] };
+      }
+    }
+  );
+
+  // Create Money Attribute
+  server.registerTool(
+    "create-entity-money-attribute",
+    {
+      title: "Create Entity Money (Currency) Attribute",
+      description: "Create a Money/Currency attribute on a Dataverse entity. The first Money column adds a transactioncurrencyid lookup if missing.",
+      inputSchema: {
+        entityName: z.string(),
+        schemaName: z.string(),
+        displayName: z.string(),
+        precisionSource: z.enum(["0", "1", "2"]).optional().describe("0=SimpleFixed (uses precision), 1=Pricing, 2=Currency (default 2)"),
+        precision: z.number().optional().describe("Display precision when precisionSource=0 (default 2)"),
+        minValue: z.number().optional(),
+        maxValue: z.number().optional(),
+        requiredLevel: z.enum(["None", "ApplicationRequired", "SystemRequired"]).optional(),
+        description: z.string().optional(),
+        languageCode: z.number().optional(),
+        solutionName: z.string().optional(),
+        environment: z.string().optional(),
+      },
+      outputSchema: z.object({ entityName: z.string(), schemaName: z.string(), attributeId: z.string() }),
+    },
+    async ({ entityName, schemaName, displayName, precisionSource, precision, minValue, maxValue, requiredLevel, description, languageCode, solutionName, environment }) => {
+      try {
+        const ctx = registry.getContext(environment);
+        const service = ctx.getEntityService();
+        const ps = precisionSource ? (parseInt(precisionSource, 10) as 0 | 1 | 2) : 2;
+        const result = await service.createMoneyAttribute(
+          entityName, schemaName, displayName,
+          ps, precision ?? 2,
+          minValue ?? -100_000_000_000, maxValue ?? 100_000_000_000,
+          requiredLevel ?? 'None', description,
+          languageCode ?? 1045, solutionName,
+        );
+        return {
+          structuredContent: { entityName, schemaName, attributeId: result.attributeId },
+          content: [{ type: "text", text: `Created money attribute '${schemaName}' on entity '${entityName}' (ID: ${result.attributeId})` }],
+        };
+      } catch (error: any) {
+        console.error("Error creating money attribute:", error);
+        return { content: [{ type: "text", text: `Failed to create money attribute: ${error.message}` }] };
+      }
+    }
+  );
+
+  // Create Decimal Attribute
+  server.registerTool(
+    "create-entity-decimal-attribute",
+    {
+      title: "Create Entity Decimal Attribute",
+      description: "Create a Decimal Number attribute on a Dataverse entity (no currency lookup needed, unlike Money).",
+      inputSchema: {
+        entityName: z.string(),
+        schemaName: z.string(),
+        displayName: z.string(),
+        precision: z.number().optional().describe("Digits after decimal (default 2, max 10)"),
+        minValue: z.number().optional(),
+        maxValue: z.number().optional(),
+        requiredLevel: z.enum(["None", "ApplicationRequired", "SystemRequired"]).optional(),
+        description: z.string().optional(),
+        languageCode: z.number().optional(),
+        solutionName: z.string().optional(),
+        environment: z.string().optional(),
+      },
+      outputSchema: z.object({ entityName: z.string(), schemaName: z.string(), attributeId: z.string() }),
+    },
+    async ({ entityName, schemaName, displayName, precision, minValue, maxValue, requiredLevel, description, languageCode, solutionName, environment }) => {
+      try {
+        const ctx = registry.getContext(environment);
+        const service = ctx.getEntityService();
+        const result = await service.createDecimalAttribute(
+          entityName, schemaName, displayName,
+          precision ?? 2,
+          minValue ?? -100_000_000_000, maxValue ?? 100_000_000_000,
+          requiredLevel ?? 'None', description,
+          languageCode ?? 1045, solutionName,
+        );
+        return {
+          structuredContent: { entityName, schemaName, attributeId: result.attributeId },
+          content: [{ type: "text", text: `Created decimal attribute '${schemaName}' on entity '${entityName}' (ID: ${result.attributeId})` }],
+        };
+      } catch (error: any) {
+        console.error("Error creating decimal attribute:", error);
+        return { content: [{ type: "text", text: `Failed to create decimal attribute: ${error.message}` }] };
+      }
+    }
+  );
+
+  // Create DateTime Attribute
+  server.registerTool(
+    "create-entity-datetime-attribute",
+    {
+      title: "Create Entity DateTime Attribute",
+      description: "Create a DateTime attribute on a Dataverse entity.",
+      inputSchema: {
+        entityName: z.string(),
+        schemaName: z.string(),
+        displayName: z.string(),
+        format: z.enum(["DateOnly", "DateAndTime"]).optional().describe("Default: DateOnly"),
+        behavior: z.enum(["UserLocal", "DateOnly", "TimeZoneIndependent"]).optional().describe("Default: UserLocal"),
+        requiredLevel: z.enum(["None", "ApplicationRequired", "SystemRequired"]).optional(),
+        description: z.string().optional(),
+        languageCode: z.number().optional(),
+        solutionName: z.string().optional(),
+        environment: z.string().optional(),
+      },
+      outputSchema: z.object({ entityName: z.string(), schemaName: z.string(), attributeId: z.string() }),
+    },
+    async ({ entityName, schemaName, displayName, format, behavior, requiredLevel, description, languageCode, solutionName, environment }) => {
+      try {
+        const ctx = registry.getContext(environment);
+        const service = ctx.getEntityService();
+        const result = await service.createDateTimeAttribute(
+          entityName, schemaName, displayName,
+          format ?? 'DateOnly', behavior ?? 'UserLocal',
+          requiredLevel ?? 'None', description,
+          languageCode ?? 1045, solutionName,
+        );
+        return {
+          structuredContent: { entityName, schemaName, attributeId: result.attributeId },
+          content: [{ type: "text", text: `Created datetime attribute '${schemaName}' on entity '${entityName}' (ID: ${result.attributeId})` }],
+        };
+      } catch (error: any) {
+        console.error("Error creating datetime attribute:", error);
+        return { content: [{ type: "text", text: `Failed to create datetime attribute: ${error.message}` }] };
+      }
+    }
+  );
+
+  // Create Integer Attribute
+  server.registerTool(
+    "create-entity-integer-attribute",
+    {
+      title: "Create Entity Integer (Whole Number) Attribute",
+      description: "Create an Integer attribute on a Dataverse entity.",
+      inputSchema: {
+        entityName: z.string(),
+        schemaName: z.string(),
+        displayName: z.string(),
+        minValue: z.number().optional().describe("Default: -2147483648"),
+        maxValue: z.number().optional().describe("Default: 2147483647"),
+        requiredLevel: z.enum(["None", "ApplicationRequired", "SystemRequired"]).optional(),
+        description: z.string().optional(),
+        languageCode: z.number().optional(),
+        solutionName: z.string().optional(),
+        environment: z.string().optional(),
+      },
+      outputSchema: z.object({ entityName: z.string(), schemaName: z.string(), attributeId: z.string() }),
+    },
+    async ({ entityName, schemaName, displayName, minValue, maxValue, requiredLevel, description, languageCode, solutionName, environment }) => {
+      try {
+        const ctx = registry.getContext(environment);
+        const service = ctx.getEntityService();
+        const result = await service.createIntegerAttribute(
+          entityName, schemaName, displayName,
+          minValue ?? -2147483648, maxValue ?? 2147483647,
+          requiredLevel ?? 'None', description,
+          languageCode ?? 1045, solutionName,
+        );
+        return {
+          structuredContent: { entityName, schemaName, attributeId: result.attributeId },
+          content: [{ type: "text", text: `Created integer attribute '${schemaName}' on entity '${entityName}' (ID: ${result.attributeId})` }],
+        };
+      } catch (error: any) {
+        console.error("Error creating integer attribute:", error);
+        return { content: [{ type: "text", text: `Failed to create integer attribute: ${error.message}` }] };
+      }
+    }
+  );
+
+  // Create Boolean Attribute
+  server.registerTool(
+    "create-entity-boolean-attribute",
+    {
+      title: "Create Entity Boolean (Yes/No) Attribute",
+      description: "Create a Two-Option (boolean) attribute on a Dataverse entity.",
+      inputSchema: {
+        entityName: z.string(),
+        schemaName: z.string(),
+        displayName: z.string(),
+        trueLabel: z.string().optional().describe("Label for the true option (default: 'Yes')"),
+        falseLabel: z.string().optional().describe("Label for the false option (default: 'No')"),
+        defaultValue: z.boolean().optional().describe("Default: false"),
+        requiredLevel: z.enum(["None", "ApplicationRequired", "SystemRequired"]).optional(),
+        description: z.string().optional(),
+        languageCode: z.number().optional(),
+        solutionName: z.string().optional(),
+        environment: z.string().optional(),
+      },
+      outputSchema: z.object({ entityName: z.string(), schemaName: z.string(), attributeId: z.string() }),
+    },
+    async ({ entityName, schemaName, displayName, trueLabel, falseLabel, defaultValue, requiredLevel, description, languageCode, solutionName, environment }) => {
+      try {
+        const ctx = registry.getContext(environment);
+        const service = ctx.getEntityService();
+        const result = await service.createBooleanAttribute(
+          entityName, schemaName, displayName,
+          trueLabel ?? 'Yes', falseLabel ?? 'No', defaultValue ?? false,
+          requiredLevel ?? 'None', description,
+          languageCode ?? 1045, solutionName,
+        );
+        return {
+          structuredContent: { entityName, schemaName, attributeId: result.attributeId },
+          content: [{ type: "text", text: `Created boolean attribute '${schemaName}' on entity '${entityName}' (ID: ${result.attributeId})` }],
+        };
+      } catch (error: any) {
+        console.error("Error creating boolean attribute:", error);
+        return { content: [{ type: "text", text: `Failed to create boolean attribute: ${error.message}` }] };
+      }
+    }
+  );
+
+  // Create Memo Attribute
+  server.registerTool(
+    "create-entity-memo-attribute",
+    {
+      title: "Create Entity Memo (Multiline Text) Attribute",
+      description: "Create a Memo (multi-line text) attribute on a Dataverse entity.",
+      inputSchema: {
+        entityName: z.string(),
+        schemaName: z.string(),
+        displayName: z.string(),
+        maxLength: z.number().optional().describe("Default: 2000"),
+        requiredLevel: z.enum(["None", "ApplicationRequired", "SystemRequired"]).optional(),
+        description: z.string().optional(),
+        languageCode: z.number().optional(),
+        solutionName: z.string().optional(),
+        environment: z.string().optional(),
+      },
+      outputSchema: z.object({ entityName: z.string(), schemaName: z.string(), attributeId: z.string() }),
+    },
+    async ({ entityName, schemaName, displayName, maxLength, requiredLevel, description, languageCode, solutionName, environment }) => {
+      try {
+        const ctx = registry.getContext(environment);
+        const service = ctx.getEntityService();
+        const result = await service.createMemoAttribute(
+          entityName, schemaName, displayName,
+          maxLength ?? 2000, requiredLevel ?? 'None', description,
+          languageCode ?? 1045, solutionName,
+        );
+        return {
+          structuredContent: { entityName, schemaName, attributeId: result.attributeId },
+          content: [{ type: "text", text: `Created memo attribute '${schemaName}' on entity '${entityName}' (ID: ${result.attributeId})` }],
+        };
+      } catch (error: any) {
+        console.error("Error creating memo attribute:", error);
+        return { content: [{ type: "text", text: `Failed to create memo attribute: ${error.message}` }] };
+      }
+    }
+  );
+
+  // Create Lookup Attribute
+  server.registerTool(
+    "create-entity-lookup-attribute",
+    {
+      title: "Create Entity Lookup (N:1) Attribute",
+      description: "Create a lookup column on a Dataverse entity. Wraps CreateOneToManyRelationship — creates both the relationship AND the lookup column.",
+      inputSchema: {
+        referencingEntity: z.string().describe("Child entity that holds the new lookup column (e.g. 'new_reservation')"),
+        referencedEntity: z.string().describe("Parent entity the lookup points to (e.g. 'contact')"),
+        relationshipSchemaName: z.string().describe("Schema name for the 1:N relationship (e.g. 'new_reservation_contact')"),
+        lookupSchemaName: z.string().describe("Schema name for the lookup column (e.g. 'new_ContactId')"),
+        displayName: z.string().describe("Display name of the lookup column"),
+        requiredLevel: z.enum(["None", "ApplicationRequired", "SystemRequired"]).optional(),
+        description: z.string().optional(),
+        cascadeDelete: z.enum(["NoCascade", "RemoveLink", "Restrict", "Cascade"]).optional().describe("Default: RemoveLink"),
+        languageCode: z.number().optional(),
+        solutionName: z.string().optional(),
+        environment: z.string().optional(),
+      },
+      outputSchema: z.object({ referencingEntity: z.string(), lookupSchemaName: z.string(), attributeId: z.string() }),
+    },
+    async ({ referencingEntity, referencedEntity, relationshipSchemaName, lookupSchemaName, displayName, requiredLevel, description, cascadeDelete, languageCode, solutionName, environment }) => {
+      try {
+        const ctx = registry.getContext(environment);
+        const service = ctx.getEntityService();
+        const result = await service.createLookupAttribute(
+          referencingEntity, referencedEntity, relationshipSchemaName, lookupSchemaName, displayName,
+          requiredLevel ?? 'None', description, cascadeDelete ?? 'RemoveLink',
+          languageCode ?? 1045, solutionName,
+        );
+        return {
+          structuredContent: { referencingEntity, lookupSchemaName, attributeId: result.attributeId },
+          content: [{ type: "text", text: `Created lookup '${lookupSchemaName}' on entity '${referencingEntity}' → '${referencedEntity}' (ID: ${result.attributeId})` }],
+        };
+      } catch (error: any) {
+        console.error("Error creating lookup attribute:", error);
+        return { content: [{ type: "text", text: `Failed to create lookup attribute: ${error.message}` }] };
+      }
+    }
+  );
+
   // Get Entity Relationships
   server.registerTool(
     "get-entity-relationships",

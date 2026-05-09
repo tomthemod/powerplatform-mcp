@@ -321,47 +321,69 @@ export class EntityService {
   }
 
   /**
-   * Create a local Picklist (Choice / OptionSet) attribute on an entity.
+   * Create a Picklist (Choice / OptionSet) attribute on an entity.
+   * Either inline `options` (creates a local option set) OR `globalOptionSetName` (links to an existing global) — exactly one of the two.
    *
    * @param entityName The logical name of the entity
    * @param schemaName Schema name for the new attribute
    * @param displayName Display name
-   * @param options Array of { value: number, label: string } defining the picklist options
+   * @param options Array of { value, label } for a LOCAL option set. Pass undefined or [] when linking to a global.
    * @param requiredLevel Required level
    * @param description Optional description
    * @param languageCode Language code for labels
    * @param solutionName Optional solution unique name
+   * @param globalOptionSetName Logical name of an existing global option set to link to (mutually exclusive with `options`)
    */
   async createPicklistAttribute(
     entityName: string,
     schemaName: string,
     displayName: string,
-    options: { value: number; label: string }[],
+    options: { value: number; label: string }[] | undefined,
     requiredLevel: 'None' | 'ApplicationRequired' | 'SystemRequired' = 'None',
     description?: string,
     languageCode: number = 1045,
     solutionName?: string,
+    globalOptionSetName?: string,
   ): Promise<{ attributeId: string }> {
     const mkLabel = (text: string) => ({
       '@odata.type': 'Microsoft.Dynamics.CRM.Label',
       LocalizedLabels: [{ '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: text, LanguageCode: languageCode }],
     });
 
+    if (globalOptionSetName && options && options.length > 0) {
+      throw new Error("Provide either `options` for a local picklist OR `globalOptionSetName` for a global one — not both.");
+    }
+    if (!globalOptionSetName && (!options || options.length === 0)) {
+      throw new Error("Provide either `options` (≥1 entry) for a local picklist or `globalOptionSetName` to link to a global one.");
+    }
+
     const body: Record<string, unknown> = {
       '@odata.type': 'Microsoft.Dynamics.CRM.PicklistAttributeMetadata',
       SchemaName: schemaName,
       DisplayName: mkLabel(displayName),
       RequiredLevel: { Value: requiredLevel },
-      OptionSet: {
+    };
+
+    if (globalOptionSetName) {
+      // Resolve the global option set MetadataId — Dataverse uses @odata.bind to attach it.
+      const globalDef = await this.client.get<{ MetadataId: string }>(
+        `api/data/v9.2/GlobalOptionSetDefinitions(Name='${globalOptionSetName}')?$select=MetadataId`,
+      );
+      if (!globalDef?.MetadataId) {
+        throw new Error(`Global option set '${globalOptionSetName}' not found.`);
+      }
+      body['GlobalOptionSet@odata.bind'] = `/GlobalOptionSetDefinitions(${globalDef.MetadataId})`;
+    } else {
+      body.OptionSet = {
         '@odata.type': 'Microsoft.Dynamics.CRM.OptionSetMetadata',
         IsGlobal: false,
         OptionSetType: 'Picklist',
-        Options: options.map(o => ({
+        Options: options!.map(o => ({
           Value: o.value,
           Label: mkLabel(o.label),
         })),
-      },
-    };
+      };
+    }
 
     if (description) {
       body.Description = mkLabel(description);
@@ -831,6 +853,62 @@ export class EntityService {
     );
 
     return { attributeId: result?.AttributeId ?? result?.entityId ?? 'created' };
+  }
+
+  /**
+   * Create a Many-to-Many (N:N) relationship between two entities.
+   * Dataverse auto-creates the intersect entity (or uses an existing one if specified).
+   *
+   * @param entity1LogicalName First entity logical name (e.g. 'contact')
+   * @param entity2LogicalName Second entity logical name (e.g. 'new_property')
+   * @param relationshipSchemaName Schema name for the N:N relationship (e.g. 'new_contact_property')
+   * @param intersectEntitySchemaName Optional schema name for the intersect entity (default: same as relationshipSchemaName)
+   * @param entity1NavLabel Display label of the related-entity menu shown on entity 1 (default: collection name of entity 2)
+   * @param entity2NavLabel Display label of the related-entity menu shown on entity 2 (default: collection name of entity 1)
+   * @param languageCode Language code for labels
+   * @param solutionName Optional solution unique name to add the component to
+   */
+  async createManyToManyRelationship(
+    entity1LogicalName: string,
+    entity2LogicalName: string,
+    relationshipSchemaName: string,
+    intersectEntitySchemaName?: string,
+    entity1NavLabel?: string,
+    entity2NavLabel?: string,
+    languageCode: number = 1045,
+    solutionName?: string,
+  ): Promise<{ relationshipId: string }> {
+    const mkLabel = (text?: string) => ({
+      '@odata.type': 'Microsoft.Dynamics.CRM.Label',
+      LocalizedLabels: text
+        ? [{ '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel', Label: text, LanguageCode: languageCode }]
+        : [] as unknown[],
+    });
+
+    const menuConfig = (label?: string) => ({
+      Behavior: 'UseCollectionName',
+      Group: 'Details',
+      Order: 10000,
+      Label: mkLabel(label),
+    });
+
+    const body = {
+      '@odata.type': 'Microsoft.Dynamics.CRM.ManyToManyRelationshipMetadata',
+      SchemaName: relationshipSchemaName,
+      Entity1LogicalName: entity1LogicalName,
+      Entity2LogicalName: entity2LogicalName,
+      IntersectEntityName: intersectEntitySchemaName ?? relationshipSchemaName,
+      Entity1AssociatedMenuConfiguration: menuConfig(entity1NavLabel),
+      Entity2AssociatedMenuConfiguration: menuConfig(entity2NavLabel),
+    };
+
+    const headers = solutionName ? { 'MSCRM.SolutionUniqueName': solutionName } : undefined;
+    const result = await this.client.post<{ AttributeId?: string; entityId?: string; MetadataId?: string }>(
+      `api/data/v9.2/RelationshipDefinitions`,
+      body,
+      headers,
+    );
+    return { relationshipId: result?.MetadataId ?? result?.entityId ?? result?.AttributeId ?? 'created' };
   }
 
   /**

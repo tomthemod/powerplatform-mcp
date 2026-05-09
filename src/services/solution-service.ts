@@ -41,6 +41,68 @@ export class SolutionService {
   }
 
   /**
+   * Create a new unmanaged solution. The publisher must already exist.
+   * @param uniqueName Unique technical name (e.g. '20260101NewFeature' — letters, digits, underscores)
+   * @param friendlyName Display name shown in the maker portal
+   * @param publisherUniqueName Unique name of an existing publisher
+   * @param version Solution version (default '1.0.0.0')
+   * @param description Optional description
+   */
+  async createSolution(
+    uniqueName: string,
+    friendlyName: string,
+    publisherUniqueName: string,
+    version: string = '1.0.0.0',
+    description?: string,
+  ): Promise<{ solutionId: string }> {
+    // Resolve publisher to its ID.
+    const publishersResp = await this.client.get<ApiCollectionResponse<Record<string, unknown>>>(
+      `api/data/v9.2/publishers?$filter=uniquename eq '${publisherUniqueName}'&$select=publisherid&$top=1`,
+    );
+    if (!publishersResp.value || publishersResp.value.length === 0) {
+      throw new Error(`Publisher '${publisherUniqueName}' not found. Create it first or pick an existing one (use get-publishers).`);
+    }
+    const publisherId = publishersResp.value[0].publisherid as string;
+
+    const body: Record<string, unknown> = {
+      uniquename: uniqueName,
+      friendlyname: friendlyName,
+      version,
+      'publisherid@odata.bind': `/publishers(${publisherId})`,
+    };
+    if (description) {
+      body.description = description;
+    }
+
+    const result = await this.client.post<{ entityId?: string }>(
+      'api/data/v9.2/solutions',
+      body,
+    );
+    return { solutionId: result?.entityId ?? 'created' };
+  }
+
+  /**
+   * Update the version of an existing solution. Used for releases (e.g. '1.0.0.0' → '1.0.1.0').
+   *
+   * @param uniqueName The unique name of the solution
+   * @param version New version string (4-part recommended: major.minor.build.revision)
+   */
+  async updateSolutionVersion(uniqueName: string, version: string): Promise<{ solutionId: string; version: string }> {
+    const solution = await this.getSolution(uniqueName);
+    if (!solution) {
+      throw new Error(`Solution '${uniqueName}' not found.`);
+    }
+    const solutionId = solution.solutionid as string;
+
+    await this.client.patch(
+      `api/data/v9.2/solutions(${solutionId})`,
+      { version },
+    );
+
+    return { solutionId, version };
+  }
+
+  /**
    * Get all components in a solution, ordered by component type.
    * First resolves the solution by unique name, then fetches its components.
    */

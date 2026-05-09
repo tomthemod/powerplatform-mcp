@@ -422,4 +422,230 @@ export function registerPluginTools(server: McpServer, registry: EnvironmentRegi
       }
     }
   );
+
+  // Get Plugin Packages
+  server.registerTool(
+    "get-plugin-packages",
+    {
+      title: "Get Plugin Packages",
+      description: "List plugin packages (.nupkg-based plugin assemblies) in the environment.",
+      inputSchema: {
+        includeManaged: z.boolean().optional().describe("Include managed packages (default: false)"),
+        maxRecords: z.number().optional().describe("Default: 100"),
+        environment: z.string().optional(),
+      },
+      outputSchema: z.object({ totalCount: z.number(), packages: z.any() }),
+    },
+    async ({ includeManaged, maxRecords, environment }) => {
+      try {
+        const ctx = registry.getContext(environment);
+        const service = ctx.getPluginService();
+        const result = await service.getPluginPackages(includeManaged ?? false, maxRecords ?? 100);
+        return {
+          structuredContent: result,
+          content: [{ type: "text", text: `Found ${result.totalCount} plugin packages:\n\n${JSON.stringify(result.packages, null, 2)}` }],
+        };
+      } catch (error: any) {
+        console.error("Error getting plugin packages:", error);
+        return { content: [{ type: "text", text: `Failed to get plugin packages: ${error.message}` }] };
+      }
+    }
+  );
+
+  // Register Plugin Package
+  server.registerTool(
+    "register-plugin-package",
+    {
+      title: "Register Plugin Package",
+      description: "Register a new plugin package by uploading a base64-encoded .nupkg file.",
+      inputSchema: {
+        name: z.string(),
+        uniqueName: z.string(),
+        version: z.string().describe("Package version, e.g. '1.0.0'"),
+        content: z.string().describe("Base64-encoded .nupkg file content"),
+        solutionName: z.string().optional(),
+        environment: z.string().optional(),
+      },
+      outputSchema: z.object({ pluginPackageId: z.string() }),
+    },
+    async ({ name, uniqueName, version, content, solutionName, environment }) => {
+      try {
+        const ctx = registry.getContext(environment);
+        const service = ctx.getPluginService();
+        const result = await service.registerPluginPackage({ name, uniqueName, version, content, solutionName });
+        return {
+          structuredContent: { pluginPackageId: result.pluginPackageId },
+          content: [{ type: "text", text: `Registered plugin package '${name}' v${version} (ID: ${result.pluginPackageId})` }],
+        };
+      } catch (error: any) {
+        console.error("Error registering plugin package:", error);
+        return { content: [{ type: "text", text: `Failed to register plugin package: ${error.message}` }] };
+      }
+    }
+  );
+
+  // Update Plugin Package
+  server.registerTool(
+    "update-plugin-package",
+    {
+      title: "Update Plugin Package",
+      description: "Update an existing plugin package's content (and optionally version).",
+      inputSchema: {
+        pluginPackageId: z.string(),
+        content: z.string().describe("Base64-encoded .nupkg file content"),
+        version: z.string().optional(),
+        environment: z.string().optional(),
+      },
+    },
+    async ({ pluginPackageId, content, version, environment }) => {
+      try {
+        const ctx = registry.getContext(environment);
+        const service = ctx.getPluginService();
+        await service.updatePluginPackage({ pluginPackageId, content, version });
+        return { content: [{ type: "text", text: `Updated plugin package ${pluginPackageId}${version ? ` to v${version}` : ''}` }] };
+      } catch (error: any) {
+        console.error("Error updating plugin package:", error);
+        return { content: [{ type: "text", text: `Failed to update plugin package: ${error.message}` }] };
+      }
+    }
+  );
+
+  // Enable Plugin Step
+  server.registerTool(
+    "enable-plugin-step",
+    {
+      title: "Enable Plugin Step",
+      description: "Activate a plugin step (statecode=0, statuscode=1).",
+      inputSchema: {
+        stepId: z.string().describe("The SDK message processing step ID"),
+        environment: z.string().optional(),
+      },
+    },
+    async ({ stepId, environment }) => {
+      try {
+        const ctx = registry.getContext(environment);
+        const service = ctx.getPluginService();
+        await service.enablePluginStep(stepId);
+        return { content: [{ type: "text", text: `Enabled plugin step ${stepId}` }] };
+      } catch (error: any) {
+        console.error("Error enabling plugin step:", error);
+        return { content: [{ type: "text", text: `Failed to enable plugin step: ${error.message}` }] };
+      }
+    }
+  );
+
+  // Disable Plugin Step
+  server.registerTool(
+    "disable-plugin-step",
+    {
+      title: "Disable Plugin Step",
+      description: "Deactivate a plugin step (statecode=1, statuscode=2). Reversible — use enable-plugin-step to re-activate.",
+      inputSchema: {
+        stepId: z.string(),
+        environment: z.string().optional(),
+      },
+    },
+    async ({ stepId, environment }) => {
+      try {
+        const ctx = registry.getContext(environment);
+        const service = ctx.getPluginService();
+        await service.disablePluginStep(stepId);
+        return { content: [{ type: "text", text: `Disabled plugin step ${stepId}` }] };
+      } catch (error: any) {
+        console.error("Error disabling plugin step:", error);
+        return { content: [{ type: "text", text: `Failed to disable plugin step: ${error.message}` }] };
+      }
+    }
+  );
+
+  // Delete Plugin Step
+  server.registerTool(
+    "delete-plugin-step",
+    {
+      title: "Delete Plugin Step",
+      description: "Delete a plugin step. Irreversible — Dataverse cascades to its images. Run check-component-dependencies first if the step is in a managed solution.",
+      inputSchema: {
+        stepId: z.string(),
+        environment: z.string().optional(),
+      },
+    },
+    async ({ stepId, environment }) => {
+      try {
+        const ctx = registry.getContext(environment);
+        const service = ctx.getPluginService();
+        await service.deletePluginStep(stepId);
+        return { content: [{ type: "text", text: `Deleted plugin step ${stepId}` }] };
+      } catch (error: any) {
+        console.error("Error deleting plugin step:", error);
+        return { content: [{ type: "text", text: `Failed to delete plugin step: ${error.message}` }] };
+      }
+    }
+  );
+
+  // Register Plugin Assembly (traditional .dll)
+  server.registerTool(
+    "register-plugin-assembly",
+    {
+      title: "Register Plugin Assembly",
+      description: "Register a traditional plugin assembly (.dll, base64-encoded). For .nupkg-based packages, use register-plugin-package instead.",
+      inputSchema: {
+        name: z.string().describe("Assembly name (display + identifier)"),
+        content: z.string().describe("Base64-encoded .dll bytes"),
+        version: z.string().describe("Assembly version, e.g. '1.0.0.0'"),
+        isolationMode: z.enum(["1", "2"]).optional().describe("1=None, 2=Sandbox (default 2 — Online forces sandbox anyway)"),
+        description: z.string().optional(),
+        solutionName: z.string().optional(),
+        environment: z.string().optional(),
+      },
+      outputSchema: z.object({ pluginAssemblyId: z.string() }),
+    },
+    async ({ name, content, version, isolationMode, description, solutionName, environment }) => {
+      try {
+        const ctx = registry.getContext(environment);
+        const service = ctx.getPluginService();
+        const iso = isolationMode ? (parseInt(isolationMode, 10) as 1 | 2) : 2;
+        const result = await service.registerPluginAssembly({ name, content, version, isolationMode: iso, description, solutionName });
+        return {
+          structuredContent: { pluginAssemblyId: result.pluginAssemblyId },
+          content: [{ type: "text", text: `Registered plugin assembly '${name}' v${version} (ID: ${result.pluginAssemblyId})` }],
+        };
+      } catch (error: any) {
+        console.error("Error registering plugin assembly:", error);
+        return { content: [{ type: "text", text: `Failed to register plugin assembly: ${error.message}` }] };
+      }
+    }
+  );
+
+  // Create Plugin Step Image
+  server.registerTool(
+    "create-plugin-step-image",
+    {
+      title: "Create Plugin Step Image",
+      description: "Register a PreImage or PostImage on an existing SDK message processing step. Images let plugins read pre/post operation row state.",
+      inputSchema: {
+        stepId: z.string().describe("The SDK message processing step ID"),
+        name: z.string().optional().describe("Default: 'PreImage'"),
+        entityAlias: z.string().optional().describe("Default: same as name"),
+        imageType: z.number().optional().describe("0=PreImage, 1=PostImage, 2=Both (default: 0)"),
+        messagePropertyName: z.string().optional().describe("Default: 'Target'"),
+        attributes: z.string().optional().describe("Comma-separated attribute names; omit for all attributes"),
+        environment: z.string().optional(),
+      },
+      outputSchema: z.object({ imageId: z.string() }),
+    },
+    async ({ stepId, name, entityAlias, imageType, messagePropertyName, attributes, environment }) => {
+      try {
+        const ctx = registry.getContext(environment);
+        const service = ctx.getPluginService();
+        const result = await service.createPluginStepImage({ stepId, name, entityAlias, imageType, messagePropertyName, attributes });
+        return {
+          structuredContent: { imageId: result.imageId },
+          content: [{ type: "text", text: `Created plugin step image (ID: ${result.imageId})` }],
+        };
+      } catch (error: any) {
+        console.error("Error creating plugin step image:", error);
+        return { content: [{ type: "text", text: `Failed to create plugin step image: ${error.message}` }] };
+      }
+    }
+  );
 }
