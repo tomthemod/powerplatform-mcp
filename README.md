@@ -8,6 +8,28 @@
 
 ---
 
+## ⚠️ Avertissement — projet expérimental, à utiliser à vos risques et périls
+
+Ce fork est un **projet personnel en développement actif**, non publié sur npm, sans cycle de release stable, sans suite de tests automatisés couvrant les chemins d'écriture. Il a été construit et éprouvé sur un seul environnement Dataverse, à des fins de productivité personnelle.
+
+**Risques spécifiques à connaître avant utilisation** :
+
+- Les opérations d'écriture exposées sont **largement destructives ou irréversibles** côté Dataverse (suppression d'attributs, suppression d'enregistrements, modification de schémas, modification de formulaires). Une erreur dans un appel peut corrompre la métadonnée ou faire perdre des données sans possibilité de rollback automatique.
+- Les outils de manipulation de **formxml** (`add-form-field`, `add-form-field-relative`, `add-form-event-handler`, `add-form-pcf-control`, `add-form-library`…) opèrent par regex sur le XML brut. Si la structure d'un formulaire diffère du cas standard, la manipulation peut le casser silencieusement (formulaire qui ne se charge plus, handlers qui ne se déclenchent plus).
+- Le format `clientdata` des cloud flows et des global option sets est partiellement non documenté par Microsoft. Un payload mal formé peut produire un composant qui se charge sans erreur mais ne fonctionne pas comme attendu.
+- Certains outils (création d'entité, de relations, d'attributs) acceptent un `solutionName` qui ajoute le composant à une solution **sans validation d'éligibilité préalable**. C'est à l'appelant de vérifier les dépendances et la cohérence de la solution.
+
+**Recommandations** :
+
+1. **N'utilisez jamais ce fork directement en production.** Limitez-le à des environnements de développement / sandbox.
+2. **Sauvegardez** systématiquement la solution cible (`export-solution`) avant toute modification destructive.
+3. **Vérifiez chaque modification** dans le maker portal après exécution — ne faites pas confiance à un retour de l'outil sans contrôle visuel côté Dataverse.
+4. **Lisez le code du service** (`src/services/<domaine>-service.ts`) avant d'utiliser un outil critique pour comprendre exactement ce qu'il fait.
+
+Ce fork est distribué **sous licence MIT** (voir `LICENSE`), **sans aucune garantie expresse ou implicite**. Ni l'auteur du fork ni l'auteur du projet amont ne pourront être tenus pour responsables d'une perte de données, d'une corruption de métadonnée, d'une indisponibilité de service, ou de tout autre dommage direct ou indirect résultant de l'utilisation de cet outil. **Vous l'utilisez sous votre entière responsabilité.**
+
+---
+
 ## Pourquoi ce fork ?
 
 Le package amont expose principalement de la lecture sur la métadonnée Dataverse plus quelques opérations d'écriture limitées (création de champs string, alternate keys, plugin steps, custom APIs, web resources, environment variables). Ce fork **ajoute la couverture write manquante** pour automatiser un projet Dynamics de bout en bout :
