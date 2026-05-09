@@ -97,7 +97,7 @@ export function registerSolutionTools(server: McpServer, registry: EnvironmentRe
       title: "Get Solution",
       description: "Get a specific solution by its unique name",
       inputSchema: {
-        uniqueName: z.string().describe("The unique name of the solution"),
+        uniqueName: z.string().describe("Unique name of the solution. Dynamics derives it from the display name by removing spaces, dashes, special characters, and accented letters (e.g. '20260501 - Service Commercial évolutions #1' → '20260501ServiceCommercialvolutions1')"),
         environment: z.string().optional().describe("Environment name (e.g. DEV, UAT). Uses default if omitted."),
       },
       outputSchema: z.object({
@@ -152,7 +152,7 @@ export function registerSolutionTools(server: McpServer, registry: EnvironmentRe
       title: "Get Solution Components",
       description: "Get all components in a solution, ordered by component type",
       inputSchema: {
-        solutionUniqueName: z.string().describe("The unique name of the solution"),
+        solutionUniqueName: z.string().describe("Unique name of the solution. Dynamics derives it from the display name by removing spaces, dashes, special characters, and accented letters (e.g. '20260501 - Service Commercial évolutions #1' → '20260501ServiceCommercialvolutions1')"),
         environment: z.string().optional().describe("Environment name (e.g. DEV, UAT). Uses default if omitted."),
       },
       outputSchema: z.object({
@@ -196,7 +196,7 @@ export function registerSolutionTools(server: McpServer, registry: EnvironmentRe
       title: "Add Solution Component",
       description: "Add a component to a Dataverse solution",
       inputSchema: {
-        solutionUniqueName: z.string().describe("The unique name of the target solution"),
+        solutionUniqueName: z.string().describe("Unique name of the target solution. Dynamics derives it from the display name by removing spaces, dashes, special characters, and accented letters (e.g. '20260501 - Service Commercial évolutions #1' → '20260501ServiceCommercialvolutions1')"),
         componentId: z.string().describe("The GUID of the component to add"),
         componentType: z.number().describe("Component type code (1=Entity, 2=Attribute, 14=SDKMessageProcessingStep, 61=WebResource, etc.)"),
         addRequiredComponents: z.boolean().optional().describe("Also add required dependencies (default: false)"),
@@ -287,7 +287,7 @@ export function registerSolutionTools(server: McpServer, registry: EnvironmentRe
       title: "Export Solution",
       description: "Export a solution as a base64-encoded package. This is a read-only operation that serializes the solution.",
       inputSchema: {
-        solutionName: z.string().describe("The unique name of the solution to export"),
+        solutionName: z.string().describe("Unique name of the solution to export. Dynamics derives it from the display name by removing spaces, dashes, special characters, and accented letters (e.g. '20260501 - Service Commercial évolutions #1' → '20260501ServiceCommercialvolutions1')"),
         managed: z.boolean().optional().describe("Export as managed solution (default: false)"),
         environment: z.string().optional().describe("Environment name (e.g. DEV, UAT). Uses default if omitted."),
       },
@@ -332,7 +332,7 @@ export function registerSolutionTools(server: McpServer, registry: EnvironmentRe
       title: "Update Solution Version",
       description: "Update the version of an existing solution. Used for releases (e.g. '1.0.0.0' → '1.0.1.0').",
       inputSchema: {
-        uniqueName: z.string().describe("The unique name of the solution"),
+        uniqueName: z.string().describe("Unique name of the solution. Dynamics derives it from the display name by removing spaces, dashes, special characters, and accented letters (e.g. '20260501 - Service Commercial évolutions #1' → '20260501ServiceCommercialvolutions1')"),
         version: z.string().describe("New version string (4-part: major.minor.build.revision)"),
         environment: z.string().optional(),
       },
@@ -361,7 +361,7 @@ export function registerSolutionTools(server: McpServer, registry: EnvironmentRe
       title: "Create Solution",
       description: "Create a new unmanaged solution. The publisher must already exist (use get-publishers to find one).",
       inputSchema: {
-        uniqueName: z.string().describe("Technical unique name (letters/digits/underscores). Convention: '{YYYYMMDD} - {EpicName}'"),
+        uniqueName: z.string().describe("Technical unique name (letters/digits/underscores). Dynamics derives it from the display name by removing spaces, dashes, special characters, and accented letters (e.g. '20260501 - Service Commercial évolutions #1' → '20260501ServiceCommercialvolutions1')"),
         friendlyName: z.string().describe("Display name shown in the maker portal"),
         publisherUniqueName: z.string().describe("Unique name of an existing publisher"),
         version: z.string().optional().describe("Default: '1.0.0.0'"),

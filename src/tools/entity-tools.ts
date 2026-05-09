@@ -153,7 +153,7 @@ export function registerEntityTools(server: McpServer, registry: EnvironmentRegi
         maxLength: z.number().optional().describe("Maximum text length (default: 100)"),
         requiredLevel: z.enum(["None", "ApplicationRequired", "SystemRequired"]).optional().describe("Required level (default: None)"),
         description: z.string().optional().describe("Description for the attribute"),
-        solutionName: z.string().optional().describe("Solution unique name to add the component to"),
+        solutionName: z.string().optional().describe("Solution unique name to add the component to. Dynamics derives it from the display name by removing spaces, dashes, special characters, and accented letters (e.g. '20260501 - Service Commercial évolutions #1' → '20260501ServiceCommercialvolutions1')"),
         environment: z.string().optional().describe("Environment name (e.g. DEV, UAT). Uses default if omitted."),
       },
       outputSchema: z.object({
@@ -250,7 +250,7 @@ export function registerEntityTools(server: McpServer, registry: EnvironmentRegi
         schemaName: z.string().describe("The schema name for the key"),
         displayName: z.string().describe("The display name for the key"),
         keyAttributes: z.array(z.string()).describe("Array of attribute logical names that make up the key"),
-        solutionName: z.string().optional().describe("Solution unique name to add the component to"),
+        solutionName: z.string().optional().describe("Solution unique name to add the component to. Dynamics derives it from the display name by removing spaces, dashes, special characters, and accented letters (e.g. '20260501 - Service Commercial évolutions #1' → '20260501ServiceCommercialvolutions1')"),
         environment: z.string().optional().describe("Environment name (e.g. DEV, UAT). Uses default if omitted."),
       },
       outputSchema: z.object({
@@ -305,7 +305,7 @@ export function registerEntityTools(server: McpServer, registry: EnvironmentRegi
         hasActivities: z.boolean().optional().describe("Track activities (default: false)"),
         hasNotes: z.boolean().optional().describe("Support notes (default: false)"),
         languageCode: z.number().optional().describe("Language code for labels (default: 1045)"),
-        solutionName: z.string().optional().describe("Solution unique name to add the entity to"),
+        solutionName: z.string().optional().describe("Solution unique name to add the entity to. Dynamics derives it from the display name by removing spaces, dashes, special characters, and accented letters (e.g. '20260501 - Service Commercial évolutions #1' → '20260501ServiceCommercialvolutions1')"),
         environment: z.string().optional().describe("Environment name (e.g. DEV, UAT). Uses default if omitted."),
       },
       outputSchema: z.object({
@@ -344,7 +344,7 @@ export function registerEntityTools(server: McpServer, registry: EnvironmentRegi
       inputSchema: {
         entityName: z.string().describe("The logical name of the entity"),
         iconVectorName: z.string().describe("Web resource name (e.g. 'new_property_icon.svg')"),
-        solutionName: z.string().optional().describe("Solution unique name to scope the change to"),
+        solutionName: z.string().optional().describe("Solution unique name to scope the change to. Dynamics derives it from the display name by removing spaces, dashes, special characters, and accented letters (e.g. '20260501 - Service Commercial évolutions #1' → '20260501ServiceCommercialvolutions1')"),
         environment: z.string().optional().describe("Environment name (e.g. DEV, UAT). Uses default if omitted."),
       },
     },

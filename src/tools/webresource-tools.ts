@@ -120,7 +120,7 @@ export function registerWebResourceTools(server: McpServer, registry: Environmen
         webResourceType: z.number().describe("Web resource type (1=HTML, 2=CSS, 3=JavaScript, 4=XML, 5=PNG, 6=JPG, 7=GIF, 8=Silverlight, 9=StyleSheet, 10=ICO, 11=Vector, 12=SVG)"),
         content: z.string().describe("The base64-encoded content of the web resource"),
         description: z.string().optional().describe("Description of the web resource"),
-        solutionName: z.string().optional().describe("Solution unique name to add the component to"),
+        solutionName: z.string().optional().describe("Solution unique name to add the component to. Dynamics derives it from the display name by removing spaces, dashes, special characters, and accented letters (e.g. '20260501 - Service Commercial évolutions #1' → '20260501ServiceCommercialvolutions1')"),
         environment: z.string().optional().describe("Environment name (e.g. DEV, UAT). Uses default if omitted."),
       },
       outputSchema: z.object({

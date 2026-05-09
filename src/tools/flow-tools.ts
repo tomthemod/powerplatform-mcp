@@ -472,7 +472,7 @@ export function registerFlowTools(server: McpServer, registry: EnvironmentRegist
         name: z.string().describe("Flow name"),
         clientData: z.string().describe("JSON string of the flow body, with top-level { schemaVersion, properties }"),
         primaryEntity: z.string().optional().describe("Primary entity logical name (default: 'none')"),
-        solutionName: z.string().optional(),
+        solutionName: z.string().optional().describe("Solution unique name to add the flow to. Dynamics derives it from the display name by removing spaces, dashes, special characters, and accented letters (e.g. '20260501 - Service Commercial évolutions #1' → '20260501ServiceCommercialvolutions1')"),
         environment: z.string().optional(),
       },
       outputSchema: z.object({ flowId: z.string(), name: z.string() }),

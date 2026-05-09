@@ -122,7 +122,7 @@ export function registerCustomApiTools(server: McpServer, registry: EnvironmentR
         allowedCustomProcessingStepType: z.number().describe("Processing step type: 0=None, 1=AsyncOnly, 2=SyncAndAsync"),
         pluginTypeId: z.string().optional().describe("Plugin type ID to bind (runs at MainOperation)"),
         pluginTypeName: z.string().optional().describe("Plugin type class name to look up and bind (e.g. miejskinajem.Plugins.Hospitable.SyncProperties)"),
-        solutionName: z.string().optional().describe("Solution unique name to add the component to"),
+        solutionName: z.string().optional().describe("Solution unique name to add the component to. Dynamics derives it from the display name by removing spaces, dashes, special characters, and accented letters (e.g. '20260501 - Service Commercial évolutions #1' → '20260501ServiceCommercialvolutions1')"),
         environment: z.string().optional().describe("Environment name (e.g. DEV, UAT). Uses default if omitted."),
       },
       outputSchema: z.object({
@@ -233,7 +233,7 @@ export function registerCustomApiTools(server: McpServer, registry: EnvironmentR
         type: z.number().describe("Type code: 0=Boolean, 1=DateTime, 2=Decimal, 3=Entity, 4=EntityCollection, 5=EntityReference, 6=Float, 7=Integer, 8=Money, 9=Picklist, 10=String, 11=StringArray, 12=Guid"),
         logicalEntityName: z.string().optional().describe("Logical entity name (required for Entity, EntityCollection, EntityReference types)"),
         isOptional: z.boolean().optional().describe("Whether this property is optional (default: false)"),
-        solutionName: z.string().optional().describe("Solution unique name to add the component to"),
+        solutionName: z.string().optional().describe("Solution unique name to add the component to. Dynamics derives it from the display name by removing spaces, dashes, special characters, and accented letters (e.g. '20260501 - Service Commercial évolutions #1' → '20260501ServiceCommercialvolutions1')"),
         environment: z.string().optional().describe("Environment name (e.g. DEV, UAT). Uses default if omitted."),
       },
       outputSchema: z.object({
@@ -330,7 +330,7 @@ export function registerCustomApiTools(server: McpServer, registry: EnvironmentR
         type: z.number().describe("Type code: 0=Boolean, 1=DateTime, 2=Decimal, 3=Entity, 4=EntityCollection, 5=EntityReference, 6=Float, 7=Integer, 8=Money, 9=Picklist, 10=String, 11=StringArray, 12=Guid"),
         logicalEntityName: z.string().optional().describe("Logical entity name (required for Entity, EntityCollection, EntityReference types)"),
         isOptional: z.boolean().optional().describe("Whether this parameter is optional (default: false)"),
-        solutionName: z.string().optional().describe("Solution unique name to add the component to"),
+        solutionName: z.string().optional().describe("Solution unique name to add the component to. Dynamics derives it from the display name by removing spaces, dashes, special characters, and accented letters (e.g. '20260501 - Service Commercial évolutions #1' → '20260501ServiceCommercialvolutions1')"),
         environment: z.string().optional().describe("Environment name (e.g. DEV, UAT). Uses default if omitted."),
       },
       outputSchema: z.object({

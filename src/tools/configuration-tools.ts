@@ -64,7 +64,7 @@ export function registerConfigurationTools(server: McpServer, registry: Environm
         type: z.enum(["String", "Number", "Boolean", "JSON", "DataSource"]).describe("The variable type"),
         defaultValue: z.string().optional().describe("Default value"),
         description: z.string().optional().describe("Description"),
-        solutionName: z.string().optional().describe("Solution unique name to add the component to"),
+        solutionName: z.string().optional().describe("Solution unique name to add the component to. Dynamics derives it from the display name by removing spaces, dashes, special characters, and accented letters (e.g. '20260501 - Service Commercial évolutions #1' → '20260501ServiceCommercialvolutions1')"),
         environment: z.string().optional().describe("Environment name (e.g. DEV, UAT). Uses default if omitted."),
       },
       outputSchema: z.object({

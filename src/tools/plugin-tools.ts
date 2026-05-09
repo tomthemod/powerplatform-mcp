@@ -334,7 +334,7 @@ export function registerPluginTools(server: McpServer, registry: EnvironmentRegi
         description: z.string().optional().describe("Step description"),
         configuration: z.string().optional().describe("Unsecure configuration string"),
         sdkMessageFilterId: z.string().optional().describe("GUID of the SDK message filter (entity filter)"),
-        solutionName: z.string().optional().describe("Solution unique name to add the component to"),
+        solutionName: z.string().optional().describe("Solution unique name to add the component to. Dynamics derives it from the display name by removing spaces, dashes, special characters, and accented letters (e.g. '20260501 - Service Commercial évolutions #1' → '20260501ServiceCommercialvolutions1')"),
         environment: z.string().optional().describe("Environment name (e.g. DEV, UAT). Uses default if omitted."),
       },
       outputSchema: z.object({

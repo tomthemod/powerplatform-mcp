@@ -13,7 +13,7 @@ export function registerSecurityRoleTools(server: McpServer, registry: Environme
       title: "Get Security Roles",
       description: "Get security roles in the PowerPlatform environment, filtered to unmanaged or customizable roles. Supports solution scoping and optional privilege details.",
       inputSchema: {
-        solutionUniqueName: z.string().optional().describe("Filter to roles in a specific solution"),
+        solutionUniqueName: z.string().optional().describe("Filter to roles in a specific solution. Dynamics derives the unique name from the display name by removing spaces, dashes, special characters, and accented letters (e.g. '20260501 - Service Commercial évolutions #1' → '20260501ServiceCommercialvolutions1')"),
         excludeSystemRoles: z.boolean().optional().describe("Exclude system roles like System Administrator (default: true)"),
         maxRecords: z.number().optional().describe("Maximum number of records to return (default: 100)"),
         includePrivileges: z.boolean().optional().describe("Include privilege details for each role (default: false)"),
@@ -105,7 +105,7 @@ export function registerSecurityRoleTools(server: McpServer, registry: Environme
       title: "Get Security Roles By Solution",
       description: "Get the security roles that are included as components of a specific solution.",
       inputSchema: {
-        solutionUniqueName: z.string().describe("The unique name of the solution"),
+        solutionUniqueName: z.string().describe("Unique name of the solution. Dynamics derives it from the display name by removing spaces, dashes, special characters, and accented letters (e.g. '20260501 - Service Commercial évolutions #1' → '20260501ServiceCommercialvolutions1')"),
         includePrivileges: z.boolean().optional().describe("Include privilege details for each role (default: false)"),
         environment: z.string().optional(),
       },
