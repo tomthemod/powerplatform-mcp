@@ -132,7 +132,10 @@ export function registerFormViewTools(server: McpServer, registry: EnvironmentRe
         };
       } catch (error: any) {
         console.error("Error adding form field (relative):", error);
-        return { content: [{ type: "text", text: `Failed to add form field (relative): ${error.message}` }] };
+        return {
+          structuredContent: { formId, attributeName, relativeToField, position, added: false },
+          content: [{ type: "text", text: `Failed to add form field (relative): ${error.message}` }],
+        };
       }
     }
   );

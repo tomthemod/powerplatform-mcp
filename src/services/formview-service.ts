@@ -135,7 +135,7 @@ export class FormViewService {
 
     // Locate the <row>...</row> block containing the reference field.
     const escaped = relativeToField.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const rowRegex = new RegExp(`<row[^>]*>[\\s\\S]*?datafieldname="${escaped}"[\\s\\S]*?<\\/row>`, 'i');
+    const rowRegex = new RegExp(`<row(?:\\s[^>]*)?>([\\s\\S]*?datafieldname="${escaped}"[\\s\\S]*?)<\\/row>`, 'i');
     const match = xml.match(rowRegex);
     if (!match) {
       throw new Error(
