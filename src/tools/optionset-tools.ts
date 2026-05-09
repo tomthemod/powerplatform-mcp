@@ -82,4 +82,153 @@ export function registerOptionSetTools(server: McpServer, registry: EnvironmentR
       }
     }
   );
+
+  // Update Attribute Label
+  server.registerTool(
+    "update-attribute-label",
+    {
+      title: "Update Attribute Label",
+      description:
+        "Update the display label of an existing column on an entity. Preserves labels in other languages. " +
+        "Does NOT publish customizations — call publish-customizations once at the end of the build.",
+      inputSchema: {
+        entityName: z.string().describe("Logical name of the entity (e.g. 'br_reservation')"),
+        attributeName: z.string().describe("Logical name of the attribute (e.g. 'br_status')"),
+        displayName: z.string().describe("New display label"),
+        languageCode: z.number().optional().describe("Language code (default: 1045)"),
+        solutionName: z.string().optional(),
+        environment: z.string().optional().describe("Environment name (e.g. DEV, UAT). Uses default if omitted."),
+      },
+      outputSchema: z.object({ entityName: z.string(), attributeName: z.string(), displayName: z.string() }),
+    },
+    async ({ entityName, attributeName, displayName, languageCode, solutionName, environment }) => {
+      try {
+        const ctx = registry.getContext(environment);
+        const service = ctx.getOptionSetService();
+        await service.updateAttributeLabel(entityName, attributeName, displayName, languageCode ?? 1045, solutionName);
+        return {
+          structuredContent: { entityName, attributeName, displayName },
+          content: [{ type: "text", text: `Updated label of '${entityName}.${attributeName}' to '${displayName}'. Remember to publish at the end of the build.` }],
+        };
+      } catch (error: any) {
+        console.error("Error updating attribute label:", error);
+        return { content: [{ type: "text", text: `Failed to update attribute label: ${error.message}` }] };
+      }
+    }
+  );
+
+  // Add Picklist Option
+  server.registerTool(
+    "add-picklist-option",
+    {
+      title: "Add Picklist Option",
+      description:
+        "Add an option to a local picklist (entityName + attributeName) or to a global option set (optionSetName). " +
+        "Provide exactly one target. Value is auto-assigned if omitted. " +
+        "Does NOT publish customizations.",
+      inputSchema: {
+        entityName: z.string().optional().describe("Local picklist: entity logical name"),
+        attributeName: z.string().optional().describe("Local picklist: attribute logical name"),
+        optionSetName: z.string().optional().describe("Global option set: schema name"),
+        label: z.string().describe("Display label of the new option"),
+        value: z.number().optional().describe("Explicit option value (auto-assigned if omitted)"),
+        languageCode: z.number().optional().describe("Language code (default: 1045)"),
+        solutionName: z.string().optional(),
+        environment: z.string().optional(),
+      },
+      outputSchema: z.object({ value: z.number() }),
+    },
+    async ({ entityName, attributeName, optionSetName, label, value, languageCode, solutionName, environment }) => {
+      try {
+        const ctx = registry.getContext(environment);
+        const service = ctx.getOptionSetService();
+        const result = await service.insertOptionValue({
+          entityName, attributeName, optionSetName, label, value, languageCode, solutionName,
+        });
+        const target = optionSetName ?? `${entityName}.${attributeName}`;
+        return {
+          structuredContent: { value: result.value },
+          content: [{ type: "text", text: `Added option '${label}' (value=${result.value}) to ${target}. Remember to publish at the end of the build.` }],
+        };
+      } catch (error: any) {
+        console.error("Error adding picklist option:", error);
+        return { content: [{ type: "text", text: `Failed to add picklist option: ${error.message}` }] };
+      }
+    }
+  );
+
+  // Remove Picklist Option
+  server.registerTool(
+    "remove-picklist-option",
+    {
+      title: "Remove Picklist Option",
+      description:
+        "Remove an option from a local picklist or a global option set. " +
+        "Existing records that hold this value will keep the orphan integer — verify usage before deleting. " +
+        "Does NOT publish customizations.",
+      inputSchema: {
+        entityName: z.string().optional(),
+        attributeName: z.string().optional(),
+        optionSetName: z.string().optional(),
+        value: z.number().describe("Option value to remove"),
+        solutionName: z.string().optional(),
+        environment: z.string().optional(),
+      },
+      outputSchema: z.object({ value: z.number(), removed: z.boolean() }),
+    },
+    async ({ entityName, attributeName, optionSetName, value, solutionName, environment }) => {
+      try {
+        const ctx = registry.getContext(environment);
+        const service = ctx.getOptionSetService();
+        await service.deleteOptionValue({ entityName, attributeName, optionSetName, value, solutionName });
+        const target = optionSetName ?? `${entityName}.${attributeName}`;
+        return {
+          structuredContent: { value, removed: true },
+          content: [{ type: "text", text: `Removed option value=${value} from ${target}. Remember to publish at the end of the build.` }],
+        };
+      } catch (error: any) {
+        console.error("Error removing picklist option:", error);
+        return { content: [{ type: "text", text: `Failed to remove picklist option: ${error.message}` }] };
+      }
+    }
+  );
+
+  // Update Picklist Option Label
+  server.registerTool(
+    "update-picklist-option-label",
+    {
+      title: "Update Picklist Option Label",
+      description:
+        "Rename an existing option in a local picklist or a global option set. " +
+        "Labels in other languages are preserved. Does NOT publish customizations.",
+      inputSchema: {
+        entityName: z.string().optional(),
+        attributeName: z.string().optional(),
+        optionSetName: z.string().optional(),
+        value: z.number().describe("Option value to relabel"),
+        label: z.string().describe("New label"),
+        languageCode: z.number().optional().describe("Language code (default: 1045)"),
+        solutionName: z.string().optional(),
+        environment: z.string().optional(),
+      },
+      outputSchema: z.object({ value: z.number(), label: z.string() }),
+    },
+    async ({ entityName, attributeName, optionSetName, value, label, languageCode, solutionName, environment }) => {
+      try {
+        const ctx = registry.getContext(environment);
+        const service = ctx.getOptionSetService();
+        await service.updateOptionValue({
+          entityName, attributeName, optionSetName, value, label, languageCode, solutionName,
+        });
+        const target = optionSetName ?? `${entityName}.${attributeName}`;
+        return {
+          structuredContent: { value, label },
+          content: [{ type: "text", text: `Renamed option value=${value} to '${label}' on ${target}. Remember to publish at the end of the build.` }],
+        };
+      } catch (error: any) {
+        console.error("Error updating picklist option label:", error);
+        return { content: [{ type: "text", text: `Failed to update picklist option label: ${error.message}` }] };
+      }
+    }
+  );
 }
