@@ -40,12 +40,14 @@ export function registerBusinessRuleTools(server: McpServer, registry: Environme
       } catch (error: any) {
         console.error("Error getting business rules:", error);
         return {
+          structuredContent: { totalCount: 0, businessRules: [] },
           content: [
             {
               type: "text",
               text: `Failed to get business rules: ${error.message}`,
             },
           ],
+          isError: true,
         };
       }
     }

@@ -25,13 +25,16 @@ export class BusinessRuleService {
     // Type: 1=Definition
     const stateFilter = activeOnly ? ' and statecode eq 1' : '';
 
+    // NOTE: `ownerid` on workflow is a polymorphic Owner lookup (user OR team) and is
+    // NOT directly expandable in OData. We use the typed nav property `owninguser`
+    // which only resolves when the owner is a systemuser — the dominant case for BRs.
     const businessRules = await this.client.get<
       ApiCollectionResponse<Record<string, unknown>>
     >(
-      `api/data/v9.2/workflows?$filter=category eq 2${stateFilter}&$select=workflowid,name,statecode,statuscode,description,createdon,modifiedon,type,ismanaged,primaryentity&$expand=ownerid($select=fullname),modifiedby($select=fullname)&$orderby=modifiedon desc&$top=${maxRecords}`
+      `api/data/v9.2/workflows?$filter=category eq 2${stateFilter}&$select=workflowid,name,statecode,statuscode,description,createdon,modifiedon,type,ismanaged,primaryentity&$expand=owninguser($select=fullname),modifiedby($select=fullname)&$orderby=modifiedon desc&$top=${maxRecords}`
     );
 
-    const formattedBusinessRules = businessRules.value.map((rule) => ({
+    const formattedBusinessRules = (businessRules.value ?? []).map((rule) => ({
       workflowid: rule.workflowid,
       name: rule.name,
       description: rule.description,
@@ -51,7 +54,7 @@ export class BusinessRuleService {
             : 'Template',
       primaryEntity: rule.primaryentity,
       isManaged: rule.ismanaged,
-      owner: (rule.ownerid as { fullname?: string })?.fullname,
+      owner: (rule.owninguser as { fullname?: string })?.fullname,
       modifiedOn: rule.modifiedon,
       modifiedBy: (rule.modifiedby as { fullname?: string })?.fullname,
       createdOn: rule.createdon,
@@ -67,8 +70,9 @@ export class BusinessRuleService {
    * Get a specific business rule with its complete XAML definition
    */
   async getBusinessRule(workflowId: string): Promise<unknown> {
+    // See note in getBusinessRules() — `ownerid` is polymorphic, use `owninguser` instead.
     const businessRule = await this.client.get<Record<string, unknown>>(
-      `api/data/v9.2/workflows(${workflowId})?$select=workflowid,name,statecode,statuscode,description,createdon,modifiedon,type,category,ismanaged,primaryentity,xaml&$expand=ownerid($select=fullname),modifiedby($select=fullname),createdby($select=fullname)`
+      `api/data/v9.2/workflows(${workflowId})?$select=workflowid,name,statecode,statuscode,description,createdon,modifiedon,type,category,ismanaged,primaryentity,xaml&$expand=owninguser($select=fullname),modifiedby($select=fullname),createdby($select=fullname)`
     );
 
     // Verify it's actually a business rule
@@ -99,7 +103,7 @@ export class BusinessRuleService {
       category: businessRule.category,
       primaryEntity: businessRule.primaryentity,
       isManaged: businessRule.ismanaged,
-      owner: (businessRule.ownerid as { fullname?: string })?.fullname,
+      owner: (businessRule.owninguser as { fullname?: string })?.fullname,
       createdOn: businessRule.createdon,
       createdBy: (businessRule.createdby as { fullname?: string })?.fullname,
       modifiedOn: businessRule.modifiedon,
