@@ -41,6 +41,7 @@ export function registerRecordTools(server: McpServer, registry: EnvironmentRegi
       } catch (error: any) {
         console.error("Error getting record:", error);
         return {
+          structuredContent: { entityNamePlural, recordId, record: null },
           content: [
             {
               type: "text",
@@ -90,6 +91,7 @@ export function registerRecordTools(server: McpServer, registry: EnvironmentRegi
       } catch (error: any) {
         console.error("Error querying records:", error);
         return {
+          structuredContent: { entityNamePlural, filter, count: 0, records: [] },
           content: [
             {
               type: "text",
@@ -125,7 +127,10 @@ export function registerRecordTools(server: McpServer, registry: EnvironmentRegi
         };
       } catch (error: any) {
         console.error("Error creating record:", error);
-        return { content: [{ type: "text", text: `Failed to create record: ${error.message}` }] };
+        return {
+          structuredContent: { entityNamePlural, entityId: "" },
+          content: [{ type: "text", text: `Failed to create record: ${error.message}` }],
+        };
       }
     }
   );

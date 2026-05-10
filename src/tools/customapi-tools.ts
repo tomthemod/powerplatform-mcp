@@ -39,6 +39,7 @@ export function registerCustomApiTools(server: McpServer, registry: EnvironmentR
       } catch (error: any) {
         console.error("Error getting Custom APIs:", error);
         return {
+          structuredContent: { customApis: [] },
           content: [
             {
               type: "text",
@@ -72,6 +73,7 @@ export function registerCustomApiTools(server: McpServer, registry: EnvironmentR
 
         if (!result) {
           return {
+            structuredContent: { customApi: null },
             content: [
               {
                 type: "text",
@@ -93,6 +95,7 @@ export function registerCustomApiTools(server: McpServer, registry: EnvironmentR
       } catch (error: any) {
         console.error("Error getting Custom API:", error);
         return {
+          structuredContent: { customApi: null },
           content: [
             {
               type: "text",
@@ -139,6 +142,7 @@ export function registerCustomApiTools(server: McpServer, registry: EnvironmentR
           const pluginType = await ctx.getPluginService().getPluginType(pluginTypeName);
           if (!pluginType) {
             return {
+              structuredContent: { customApiId: "" },
               content: [{ type: "text", text: `Plugin type '${pluginTypeName}' not found` }],
             };
           }
@@ -164,6 +168,7 @@ export function registerCustomApiTools(server: McpServer, registry: EnvironmentR
       } catch (error: any) {
         console.error("Error creating Custom API:", error);
         return {
+          structuredContent: { customApiId: "" },
           content: [
             {
               type: "text",
@@ -207,6 +212,7 @@ export function registerCustomApiTools(server: McpServer, registry: EnvironmentR
       } catch (error: any) {
         console.error("Error getting Custom API response properties:", error);
         return {
+          structuredContent: { responseProperties: [] },
           content: [
             {
               type: "text",
@@ -261,6 +267,7 @@ export function registerCustomApiTools(server: McpServer, registry: EnvironmentR
       } catch (error: any) {
         console.error("Error creating Custom API response property:", error);
         return {
+          structuredContent: { responsePropertyId: "" },
           content: [
             {
               type: "text",
@@ -304,6 +311,7 @@ export function registerCustomApiTools(server: McpServer, registry: EnvironmentR
       } catch (error: any) {
         console.error("Error getting Custom API request parameters:", error);
         return {
+          structuredContent: { requestParameters: [] },
           content: [
             {
               type: "text",
@@ -358,6 +366,7 @@ export function registerCustomApiTools(server: McpServer, registry: EnvironmentR
       } catch (error: any) {
         console.error("Error creating Custom API request parameter:", error);
         return {
+          structuredContent: { requestParameterId: "" },
           content: [
             {
               type: "text",

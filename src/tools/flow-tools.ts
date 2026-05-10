@@ -52,6 +52,7 @@ export function registerFlowTools(server: McpServer, registry: EnvironmentRegist
       } catch (error: any) {
         console.error("Error getting flows:", error);
         return {
+          structuredContent: { totalCount: 0, hasMore: false, flows: [] },
           content: [
             {
               type: "text",
@@ -111,6 +112,7 @@ export function registerFlowTools(server: McpServer, registry: EnvironmentRegist
       } catch (error: any) {
         console.error("Error searching workflows:", error);
         return {
+          structuredContent: { totalCount: 0, hasMore: false, workflows: [] },
           content: [
             {
               type: "text",
@@ -156,6 +158,7 @@ export function registerFlowTools(server: McpServer, registry: EnvironmentRegist
       } catch (error: any) {
         console.error("Error getting flow definition:", error);
         return {
+          structuredContent: { flowDefinition: null },
           content: [
             {
               type: "text",
@@ -211,6 +214,7 @@ export function registerFlowTools(server: McpServer, registry: EnvironmentRegist
       } catch (error: any) {
         console.error("Error getting flow runs:", error);
         return {
+          structuredContent: { flowId, totalCount: 0, hasMore: false, runs: [] },
           content: [
             {
               type: "text",
@@ -262,6 +266,7 @@ export function registerFlowTools(server: McpServer, registry: EnvironmentRegist
       } catch (error: any) {
         console.error("Error getting flow run details:", error);
         return {
+          structuredContent: { flowId, actionsSummary: null, failedActionErrors: [] },
           content: [
             {
               type: "text",
@@ -309,6 +314,7 @@ export function registerFlowTools(server: McpServer, registry: EnvironmentRegist
       } catch (error: any) {
         console.error("Error cancelling flow run:", error);
         return {
+          structuredContent: { success: false, flowId, runId, previousStatus: "" },
           content: [
             {
               type: "text",
@@ -357,6 +363,7 @@ export function registerFlowTools(server: McpServer, registry: EnvironmentRegist
       } catch (error: any) {
         console.error("Error resubmitting flow run:", error);
         return {
+          structuredContent: { success: false, flowId, originalRunId: runId, newRunId: "", triggerName: "" },
           content: [
             {
               type: "text",
@@ -488,7 +495,10 @@ export function registerFlowTools(server: McpServer, registry: EnvironmentRegist
         };
       } catch (error: any) {
         console.error("Error creating cloud flow:", error);
-        return { content: [{ type: "text", text: `Failed to create cloud flow: ${error.message}` }] };
+        return {
+          structuredContent: { flowId: "", name },
+          content: [{ type: "text", text: `Failed to create cloud flow: ${error.message}` }],
+        };
       }
     }
   );
@@ -522,7 +532,10 @@ export function registerFlowTools(server: McpServer, registry: EnvironmentRegist
         };
       } catch (error: any) {
         console.error("Error setting flow state:", error);
-        return { content: [{ type: "text", text: `Failed to set flow state: ${error.message}` }] };
+        return {
+          structuredContent: { success: false, flowId, previousState: "", newState: "" },
+          content: [{ type: "text", text: `Failed to set flow state: ${error.message}` }],
+        };
       }
     }
   );

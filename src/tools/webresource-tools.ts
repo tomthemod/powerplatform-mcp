@@ -42,6 +42,7 @@ export function registerWebResourceTools(server: McpServer, registry: Environmen
       } catch (error: any) {
         console.error("Error getting web resources:", error);
         return {
+          structuredContent: { webResources: [], count: 0 },
           content: [
             {
               type: "text",
@@ -76,6 +77,7 @@ export function registerWebResourceTools(server: McpServer, registry: Environmen
 
         if (!webResource) {
           return {
+            structuredContent: { name, webResource: null },
             content: [
               {
                 type: "text",
@@ -97,6 +99,7 @@ export function registerWebResourceTools(server: McpServer, registry: Environmen
       } catch (error: any) {
         console.error("Error getting web resource:", error);
         return {
+          structuredContent: { name, webResource: null },
           content: [
             {
               type: "text",
@@ -148,6 +151,7 @@ export function registerWebResourceTools(server: McpServer, registry: Environmen
       } catch (error: any) {
         console.error("Error creating web resource:", error);
         return {
+          structuredContent: { name, webResourceId: "" },
           content: [
             {
               type: "text",
@@ -237,7 +241,10 @@ export function registerWebResourceTools(server: McpServer, registry: Environmen
         };
       } catch (error: any) {
         console.error("Error upserting web resource:", error);
-        return { content: [{ type: "text", text: `Failed to upsert web resource: ${error.message}` }] };
+        return {
+          structuredContent: { name, webResourceId: "", created: false },
+          content: [{ type: "text", text: `Failed to upsert web resource: ${error.message}` }],
+        };
       }
     }
   );

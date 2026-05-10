@@ -42,6 +42,7 @@ export function registerWorkflowTools(server: McpServer, registry: EnvironmentRe
       } catch (error: any) {
         console.error("Error getting workflows:", error);
         return {
+          structuredContent: { totalCount: 0, hasMore: false, requestedMax: maxRecords ?? 25, workflows: [] },
           content: [
             {
               type: "text",

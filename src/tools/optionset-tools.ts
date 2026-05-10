@@ -39,6 +39,7 @@ export function registerOptionSetTools(server: McpServer, registry: EnvironmentR
       } catch (error: any) {
         console.error("Error getting global option set:", error);
         return {
+          structuredContent: { optionSetName, optionSet: null },
           content: [
             {
               type: "text",
@@ -78,7 +79,10 @@ export function registerOptionSetTools(server: McpServer, registry: EnvironmentR
         };
       } catch (error: any) {
         console.error("Error creating global option set:", error);
-        return { content: [{ type: "text", text: `Failed to create global option set: ${error.message}` }] };
+        return {
+          structuredContent: { name, optionSetId: "" },
+          content: [{ type: "text", text: `Failed to create global option set: ${error.message}` }],
+        };
       }
     }
   );
@@ -112,7 +116,10 @@ export function registerOptionSetTools(server: McpServer, registry: EnvironmentR
         };
       } catch (error: any) {
         console.error("Error updating attribute label:", error);
-        return { content: [{ type: "text", text: `Failed to update attribute label: ${error.message}` }] };
+        return {
+          structuredContent: { entityName, attributeName, displayName },
+          content: [{ type: "text", text: `Failed to update attribute label: ${error.message}` }],
+        };
       }
     }
   );
@@ -152,7 +159,10 @@ export function registerOptionSetTools(server: McpServer, registry: EnvironmentR
         };
       } catch (error: any) {
         console.error("Error adding picklist option:", error);
-        return { content: [{ type: "text", text: `Failed to add picklist option: ${error.message}` }] };
+        return {
+          structuredContent: { value: value ?? -1 },
+          content: [{ type: "text", text: `Failed to add picklist option: ${error.message}` }],
+        };
       }
     }
   );
@@ -188,7 +198,10 @@ export function registerOptionSetTools(server: McpServer, registry: EnvironmentR
         };
       } catch (error: any) {
         console.error("Error removing picklist option:", error);
-        return { content: [{ type: "text", text: `Failed to remove picklist option: ${error.message}` }] };
+        return {
+          structuredContent: { value, removed: false },
+          content: [{ type: "text", text: `Failed to remove picklist option: ${error.message}` }],
+        };
       }
     }
   );
@@ -227,7 +240,10 @@ export function registerOptionSetTools(server: McpServer, registry: EnvironmentR
         };
       } catch (error: any) {
         console.error("Error updating picklist option label:", error);
-        return { content: [{ type: "text", text: `Failed to update picklist option label: ${error.message}` }] };
+        return {
+          structuredContent: { value, label },
+          content: [{ type: "text", text: `Failed to update picklist option label: ${error.message}` }],
+        };
       }
     }
   );

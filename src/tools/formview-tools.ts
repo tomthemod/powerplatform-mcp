@@ -36,7 +36,10 @@ export function registerFormViewTools(server: McpServer, registry: EnvironmentRe
         };
       } catch (error: any) {
         console.error("Error getting entity forms:", error);
-        return { content: [{ type: "text", text: `Failed to get entity forms: ${error.message}` }] };
+        return {
+          structuredContent: { entityLogicalName, count: 0, forms: [] },
+          content: [{ type: "text", text: `Failed to get entity forms: ${error.message}` }],
+        };
       }
     }
   );
@@ -64,7 +67,10 @@ export function registerFormViewTools(server: McpServer, registry: EnvironmentRe
         };
       } catch (error: any) {
         console.error("Error getting form fields:", error);
-        return { content: [{ type: "text", text: `Failed to get form fields: ${error.message}` }] };
+        return {
+          structuredContent: { formId, count: 0, fields: [] },
+          content: [{ type: "text", text: `Failed to get form fields: ${error.message}` }],
+        };
       }
     }
   );
@@ -94,7 +100,10 @@ export function registerFormViewTools(server: McpServer, registry: EnvironmentRe
         };
       } catch (error: any) {
         console.error("Error adding form field:", error);
-        return { content: [{ type: "text", text: `Failed to add form field: ${error.message}` }] };
+        return {
+          structuredContent: { formId, attributeName, added: false },
+          content: [{ type: "text", text: `Failed to add form field: ${error.message}` }],
+        };
       }
     }
   );
@@ -165,7 +174,10 @@ export function registerFormViewTools(server: McpServer, registry: EnvironmentRe
         };
       } catch (error: any) {
         console.error("Error removing form field:", error);
-        return { content: [{ type: "text", text: `Failed to remove form field: ${error.message}` }] };
+        return {
+          structuredContent: { formId, attributeName, removed: false },
+          content: [{ type: "text", text: `Failed to remove form field: ${error.message}` }],
+        };
       }
     }
   );
@@ -197,7 +209,10 @@ export function registerFormViewTools(server: McpServer, registry: EnvironmentRe
         };
       } catch (error: any) {
         console.error("Error adding form library:", error);
-        return { content: [{ type: "text", text: `Failed to add form library: ${error.message}` }] };
+        return {
+          structuredContent: { formId, libraryName, added: false },
+          content: [{ type: "text", text: `Failed to add form library: ${error.message}` }],
+        };
       }
     }
   );
@@ -228,7 +243,10 @@ export function registerFormViewTools(server: McpServer, registry: EnvironmentRe
         };
       } catch (error: any) {
         console.error("Error removing form library:", error);
-        return { content: [{ type: "text", text: `Failed to remove form library: ${error.message}` }] };
+        return {
+          structuredContent: { formId, libraryName, removed: false },
+          content: [{ type: "text", text: `Failed to remove form library: ${error.message}` }],
+        };
       }
     }
   );
@@ -275,7 +293,10 @@ export function registerFormViewTools(server: McpServer, registry: EnvironmentRe
         };
       } catch (error: any) {
         console.error("Error adding form event handler:", error);
-        return { content: [{ type: "text", text: `Failed to add form event handler: ${error.message}` }] };
+        return {
+          structuredContent: { formId, eventName, functionName, attributeName, added: false },
+          content: [{ type: "text", text: `Failed to add form event handler: ${error.message}` }],
+        };
       }
     }
   );
@@ -306,7 +327,10 @@ export function registerFormViewTools(server: McpServer, registry: EnvironmentRe
         };
       } catch (error: any) {
         console.error("Error removing form event handler:", error);
-        return { content: [{ type: "text", text: `Failed to remove form event handler: ${error.message}` }] };
+        return {
+          structuredContent: { formId, functionName, removed: false },
+          content: [{ type: "text", text: `Failed to remove form event handler: ${error.message}` }],
+        };
       }
     }
   );
@@ -341,7 +365,10 @@ export function registerFormViewTools(server: McpServer, registry: EnvironmentRe
         };
       } catch (error: any) {
         console.error("Error adding form PCF control:", error);
-        return { content: [{ type: "text", text: `Failed to add form PCF control: ${error.message}` }] };
+        return {
+          structuredContent: { formId, attributeName, pcfControlName, added: false },
+          content: [{ type: "text", text: `Failed to add form PCF control: ${error.message}` }],
+        };
       }
     }
   );
@@ -371,7 +398,10 @@ export function registerFormViewTools(server: McpServer, registry: EnvironmentRe
         };
       } catch (error: any) {
         console.error("Error removing form PCF control:", error);
-        return { content: [{ type: "text", text: `Failed to remove form PCF control: ${error.message}` }] };
+        return {
+          structuredContent: { formId, attributeName, removed: false },
+          content: [{ type: "text", text: `Failed to remove form PCF control: ${error.message}` }],
+        };
       }
     }
   );
@@ -401,7 +431,10 @@ export function registerFormViewTools(server: McpServer, registry: EnvironmentRe
         };
       } catch (error: any) {
         console.error("Error getting entity views:", error);
-        return { content: [{ type: "text", text: `Failed to get entity views: ${error.message}` }] };
+        return {
+          structuredContent: { entityLogicalName, count: 0, views: [] },
+          content: [{ type: "text", text: `Failed to get entity views: ${error.message}` }],
+        };
       }
     }
   );
@@ -429,7 +462,10 @@ export function registerFormViewTools(server: McpServer, registry: EnvironmentRe
         };
       } catch (error: any) {
         console.error("Error getting view columns:", error);
-        return { content: [{ type: "text", text: `Failed to get view columns: ${error.message}` }] };
+        return {
+          structuredContent: { viewId, count: 0, columns: [] },
+          content: [{ type: "text", text: `Failed to get view columns: ${error.message}` }],
+        };
       }
     }
   );
@@ -460,7 +496,10 @@ export function registerFormViewTools(server: McpServer, registry: EnvironmentRe
         };
       } catch (error: any) {
         console.error("Error adding view column:", error);
-        return { content: [{ type: "text", text: `Failed to add view column: ${error.message}` }] };
+        return {
+          structuredContent: { viewId, attributeName, added: false },
+          content: [{ type: "text", text: `Failed to add view column: ${error.message}` }],
+        };
       }
     }
   );
@@ -499,7 +538,10 @@ export function registerFormViewTools(server: McpServer, registry: EnvironmentRe
         };
       } catch (error: any) {
         console.error("Error adding view column (relative):", error);
-        return { content: [{ type: "text", text: `Failed to add view column (relative): ${error.message}` }] };
+        return {
+          structuredContent: { viewId, attributeName, relativeToField, position, added: false },
+          content: [{ type: "text", text: `Failed to add view column (relative): ${error.message}` }],
+        };
       }
     }
   );
@@ -529,7 +571,10 @@ export function registerFormViewTools(server: McpServer, registry: EnvironmentRe
         };
       } catch (error: any) {
         console.error("Error removing view column:", error);
-        return { content: [{ type: "text", text: `Failed to remove view column: ${error.message}` }] };
+        return {
+          structuredContent: { viewId, attributeName, removed: false },
+          content: [{ type: "text", text: `Failed to remove view column: ${error.message}` }],
+        };
       }
     }
   );
@@ -561,7 +606,10 @@ export function registerFormViewTools(server: McpServer, registry: EnvironmentRe
         };
       } catch (error: any) {
         console.error("Error setting view columns:", error);
-        return { content: [{ type: "text", text: `Failed to set view columns: ${error.message}` }] };
+        return {
+          structuredContent: { viewId, columns: [] },
+          content: [{ type: "text", text: `Failed to set view columns: ${error.message}` }],
+        };
       }
     }
   );

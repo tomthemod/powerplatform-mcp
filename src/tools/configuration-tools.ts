@@ -41,6 +41,7 @@ export function registerConfigurationTools(server: McpServer, registry: Environm
       } catch (error: any) {
         console.error("Error getting connection references:", error);
         return {
+          structuredContent: { connectionReferences: [] },
           content: [
             {
               type: "text",
@@ -96,6 +97,7 @@ export function registerConfigurationTools(server: McpServer, registry: Environm
       } catch (error: any) {
         console.error("Error creating environment variable:", error);
         return {
+          structuredContent: { schemaName, definitionId: "" },
           content: [
             {
               type: "text",
@@ -143,6 +145,7 @@ export function registerConfigurationTools(server: McpServer, registry: Environm
       } catch (error: any) {
         console.error("Error setting environment variable value:", error);
         return {
+          structuredContent: { valueId: "" },
           content: [
             {
               type: "text",
@@ -187,6 +190,7 @@ export function registerConfigurationTools(server: McpServer, registry: Environm
       } catch (error: any) {
         console.error("Error getting environment variables:", error);
         return {
+          structuredContent: { environmentVariables: [] },
           content: [
             {
               type: "text",
@@ -225,7 +229,10 @@ export function registerConfigurationTools(server: McpServer, registry: Environm
         };
       } catch (error: any) {
         console.error("Error creating connection reference:", error);
-        return { content: [{ type: "text", text: `Failed to create connection reference: ${error.message}` }] };
+        return {
+          structuredContent: { connectionReferenceId: "" },
+          content: [{ type: "text", text: `Failed to create connection reference: ${error.message}` }],
+        };
       }
     }
   );

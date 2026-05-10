@@ -39,6 +39,7 @@ export function registerEntityTools(server: McpServer, registry: EnvironmentRegi
       } catch (error: any) {
         console.error("Error getting entity metadata:", error);
         return {
+          structuredContent: { entityName, metadata: null },
           content: [
             {
               type: "text",
@@ -83,6 +84,7 @@ export function registerEntityTools(server: McpServer, registry: EnvironmentRegi
       } catch (error: any) {
         console.error("Error getting entity attributes:", error);
         return {
+          structuredContent: { entityName, attributes: [] },
           content: [
             {
               type: "text",
@@ -129,6 +131,7 @@ export function registerEntityTools(server: McpServer, registry: EnvironmentRegi
       } catch (error: any) {
         console.error("Error getting entity attribute:", error);
         return {
+          structuredContent: { entityName, attributeName, attribute: null },
           content: [
             {
               type: "text",
@@ -184,6 +187,7 @@ export function registerEntityTools(server: McpServer, registry: EnvironmentRegi
       } catch (error: any) {
         console.error("Error creating entity attribute:", error);
         return {
+          structuredContent: { entityName, schemaName, attributeId: "" },
           content: [
             {
               type: "text",
@@ -228,6 +232,7 @@ export function registerEntityTools(server: McpServer, registry: EnvironmentRegi
       } catch (error: any) {
         console.error("Error getting entity keys:", error);
         return {
+          structuredContent: { entityName, keys: [] },
           content: [
             {
               type: "text",
@@ -277,6 +282,7 @@ export function registerEntityTools(server: McpServer, registry: EnvironmentRegi
       } catch (error: any) {
         console.error("Error creating alternate key:", error);
         return {
+          structuredContent: { entityName, schemaName, keyId: "" },
           content: [
             {
               type: "text",
@@ -330,7 +336,10 @@ export function registerEntityTools(server: McpServer, registry: EnvironmentRegi
         };
       } catch (error: any) {
         console.error("Error creating entity:", error);
-        return { content: [{ type: "text", text: `Failed to create entity: ${error.message}` }] };
+        return {
+          structuredContent: { schemaName, entityId: "" },
+          content: [{ type: "text", text: `Failed to create entity: ${error.message}` }],
+        };
       }
     }
   );
@@ -401,7 +410,10 @@ export function registerEntityTools(server: McpServer, registry: EnvironmentRegi
         };
       } catch (error: any) {
         console.error("Error creating picklist attribute:", error);
-        return { content: [{ type: "text", text: `Failed to create picklist attribute: ${error.message}` }] };
+        return {
+          structuredContent: { entityName, schemaName, attributeId: "" },
+          content: [{ type: "text", text: `Failed to create picklist attribute: ${error.message}` }],
+        };
       }
     }
   );
@@ -440,7 +452,10 @@ export function registerEntityTools(server: McpServer, registry: EnvironmentRegi
         };
       } catch (error: any) {
         console.error("Error creating N:N relationship:", error);
-        return { content: [{ type: "text", text: `Failed to create N:N relationship: ${error.message}` }] };
+        return {
+          structuredContent: { relationshipSchemaName, relationshipId: "" },
+          content: [{ type: "text", text: `Failed to create N:N relationship: ${error.message}` }],
+        };
       }
     }
   );
@@ -510,7 +525,10 @@ export function registerEntityTools(server: McpServer, registry: EnvironmentRegi
         };
       } catch (error: any) {
         console.error("Error creating money attribute:", error);
-        return { content: [{ type: "text", text: `Failed to create money attribute: ${error.message}` }] };
+        return {
+          structuredContent: { entityName, schemaName, attributeId: "" },
+          content: [{ type: "text", text: `Failed to create money attribute: ${error.message}` }],
+        };
       }
     }
   );
@@ -553,7 +571,10 @@ export function registerEntityTools(server: McpServer, registry: EnvironmentRegi
         };
       } catch (error: any) {
         console.error("Error creating decimal attribute:", error);
-        return { content: [{ type: "text", text: `Failed to create decimal attribute: ${error.message}` }] };
+        return {
+          structuredContent: { entityName, schemaName, attributeId: "" },
+          content: [{ type: "text", text: `Failed to create decimal attribute: ${error.message}` }],
+        };
       }
     }
   );
@@ -594,7 +615,10 @@ export function registerEntityTools(server: McpServer, registry: EnvironmentRegi
         };
       } catch (error: any) {
         console.error("Error creating datetime attribute:", error);
-        return { content: [{ type: "text", text: `Failed to create datetime attribute: ${error.message}` }] };
+        return {
+          structuredContent: { entityName, schemaName, attributeId: "" },
+          content: [{ type: "text", text: `Failed to create datetime attribute: ${error.message}` }],
+        };
       }
     }
   );
@@ -635,7 +659,10 @@ export function registerEntityTools(server: McpServer, registry: EnvironmentRegi
         };
       } catch (error: any) {
         console.error("Error creating integer attribute:", error);
-        return { content: [{ type: "text", text: `Failed to create integer attribute: ${error.message}` }] };
+        return {
+          structuredContent: { entityName, schemaName, attributeId: "" },
+          content: [{ type: "text", text: `Failed to create integer attribute: ${error.message}` }],
+        };
       }
     }
   );
@@ -677,7 +704,10 @@ export function registerEntityTools(server: McpServer, registry: EnvironmentRegi
         };
       } catch (error: any) {
         console.error("Error creating boolean attribute:", error);
-        return { content: [{ type: "text", text: `Failed to create boolean attribute: ${error.message}` }] };
+        return {
+          structuredContent: { entityName, schemaName, attributeId: "" },
+          content: [{ type: "text", text: `Failed to create boolean attribute: ${error.message}` }],
+        };
       }
     }
   );
@@ -716,7 +746,10 @@ export function registerEntityTools(server: McpServer, registry: EnvironmentRegi
         };
       } catch (error: any) {
         console.error("Error creating memo attribute:", error);
-        return { content: [{ type: "text", text: `Failed to create memo attribute: ${error.message}` }] };
+        return {
+          structuredContent: { entityName, schemaName, attributeId: "" },
+          content: [{ type: "text", text: `Failed to create memo attribute: ${error.message}` }],
+        };
       }
     }
   );
@@ -757,7 +790,10 @@ export function registerEntityTools(server: McpServer, registry: EnvironmentRegi
         };
       } catch (error: any) {
         console.error("Error creating lookup attribute:", error);
-        return { content: [{ type: "text", text: `Failed to create lookup attribute: ${error.message}` }] };
+        return {
+          structuredContent: { referencingEntity, lookupSchemaName, attributeId: "" },
+          content: [{ type: "text", text: `Failed to create lookup attribute: ${error.message}` }],
+        };
       }
     }
   );
@@ -795,6 +831,7 @@ export function registerEntityTools(server: McpServer, registry: EnvironmentRegi
       } catch (error: any) {
         console.error("Error getting entity relationships:", error);
         return {
+          structuredContent: { entityName, relationships: [] },
           content: [
             {
               type: "text",

@@ -40,6 +40,7 @@ export function registerPluginTools(server: McpServer, registry: EnvironmentRegi
       } catch (error: any) {
         console.error("Error getting plugin assemblies:", error);
         return {
+          structuredContent: { totalCount: 0, assemblies: [] },
           content: [
             {
               type: "text",
@@ -91,6 +92,7 @@ export function registerPluginTools(server: McpServer, registry: EnvironmentRegi
       } catch (error: any) {
         console.error("Error getting plugin assembly:", error);
         return {
+          structuredContent: { assembly: null, pluginTypes: [], steps: [], validation: null },
           content: [
             {
               type: "text",
@@ -143,6 +145,7 @@ export function registerPluginTools(server: McpServer, registry: EnvironmentRegi
       } catch (error: any) {
         console.error("Error getting entity plugin pipeline:", error);
         return {
+          structuredContent: { entity: entityName, messages: [], steps: [], executionOrder: [] },
           content: [
             {
               type: "text",
@@ -206,6 +209,7 @@ export function registerPluginTools(server: McpServer, registry: EnvironmentRegi
       } catch (error: any) {
         console.error("Error getting plugin trace logs:", error);
         return {
+          structuredContent: { totalCount: 0, logs: [] },
           content: [
             {
               type: "text",
@@ -240,6 +244,7 @@ export function registerPluginTools(server: McpServer, registry: EnvironmentRegi
 
         if (!pluginType) {
           return {
+            structuredContent: { typeName, pluginType: null },
             content: [{ type: "text", text: `Plugin type '${typeName}' not found` }],
           };
         }
@@ -256,6 +261,7 @@ export function registerPluginTools(server: McpServer, registry: EnvironmentRegi
       } catch (error: any) {
         console.error("Error getting plugin type:", error);
         return {
+          structuredContent: { typeName, pluginType: null },
           content: [{ type: "text", text: `Failed to get plugin type: ${error.message}` }],
         };
       }
@@ -285,6 +291,7 @@ export function registerPluginTools(server: McpServer, registry: EnvironmentRegi
 
         if (!message) {
           return {
+            structuredContent: { messageName, message: null },
             content: [
               {
                 type: "text",
@@ -306,6 +313,7 @@ export function registerPluginTools(server: McpServer, registry: EnvironmentRegi
       } catch (error: any) {
         console.error("Error getting SDK message:", error);
         return {
+          structuredContent: { messageName, message: null },
           content: [
             {
               type: "text",
@@ -366,6 +374,7 @@ export function registerPluginTools(server: McpServer, registry: EnvironmentRegi
       } catch (error: any) {
         console.error("Error creating plugin step:", error);
         return {
+          structuredContent: { name, stepId: "" },
           content: [
             {
               type: "text",
@@ -447,7 +456,10 @@ export function registerPluginTools(server: McpServer, registry: EnvironmentRegi
         };
       } catch (error: any) {
         console.error("Error getting plugin packages:", error);
-        return { content: [{ type: "text", text: `Failed to get plugin packages: ${error.message}` }] };
+        return {
+          structuredContent: { totalCount: 0, packages: [] },
+          content: [{ type: "text", text: `Failed to get plugin packages: ${error.message}` }],
+        };
       }
     }
   );
@@ -479,7 +491,10 @@ export function registerPluginTools(server: McpServer, registry: EnvironmentRegi
         };
       } catch (error: any) {
         console.error("Error registering plugin package:", error);
-        return { content: [{ type: "text", text: `Failed to register plugin package: ${error.message}` }] };
+        return {
+          structuredContent: { pluginPackageId: "" },
+          content: [{ type: "text", text: `Failed to register plugin package: ${error.message}` }],
+        };
       }
     }
   );
@@ -611,7 +626,10 @@ export function registerPluginTools(server: McpServer, registry: EnvironmentRegi
         };
       } catch (error: any) {
         console.error("Error registering plugin assembly:", error);
-        return { content: [{ type: "text", text: `Failed to register plugin assembly: ${error.message}` }] };
+        return {
+          structuredContent: { pluginAssemblyId: "" },
+          content: [{ type: "text", text: `Failed to register plugin assembly: ${error.message}` }],
+        };
       }
     }
   );
@@ -644,7 +662,10 @@ export function registerPluginTools(server: McpServer, registry: EnvironmentRegi
         };
       } catch (error: any) {
         console.error("Error creating plugin step image:", error);
-        return { content: [{ type: "text", text: `Failed to create plugin step image: ${error.message}` }] };
+        return {
+          structuredContent: { imageId: "" },
+          content: [{ type: "text", text: `Failed to create plugin step image: ${error.message}` }],
+        };
       }
     }
   );

@@ -100,12 +100,31 @@ export function registerBusinessRuleTools(server: McpServer, registry: Environme
       } catch (error: any) {
         console.error("Error getting business rule:", error);
         return {
+          structuredContent: {
+            workflowid: workflowId,
+            name: "",
+            description: null,
+            state: "",
+            statecode: 0,
+            statuscode: 0,
+            type: "",
+            category: 0,
+            primaryEntity: null,
+            isManaged: null,
+            owner: null,
+            createdOn: null,
+            createdBy: null,
+            modifiedOn: null,
+            modifiedBy: null,
+            xaml: null,
+          },
           content: [
             {
               type: "text",
               text: `Failed to get business rule: ${error.message}`,
             },
           ],
+          isError: true,
         };
       }
     }

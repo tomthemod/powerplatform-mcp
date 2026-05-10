@@ -41,6 +41,7 @@ export function registerSecurityRoleTools(server: McpServer, registry: Environme
       } catch (error: any) {
         console.error("Error getting security roles:", error);
         return {
+          structuredContent: { roles: [] },
           content: [
             {
               type: "text",
@@ -87,6 +88,7 @@ export function registerSecurityRoleTools(server: McpServer, registry: Environme
       } catch (error: any) {
         console.error("Error getting security role privileges:", error);
         return {
+          structuredContent: { roleId, privileges: [] },
           content: [
             {
               type: "text",
@@ -122,7 +124,10 @@ export function registerSecurityRoleTools(server: McpServer, registry: Environme
         };
       } catch (error: any) {
         console.error("Error getting roles by solution:", error);
-        return { content: [{ type: "text", text: `Failed to get roles by solution: ${error.message}` }] };
+        return {
+          structuredContent: { solutionUniqueName, count: 0, roles: [] },
+          content: [{ type: "text", text: `Failed to get roles by solution: ${error.message}` }],
+        };
       }
     }
   );

@@ -37,6 +37,7 @@ export function registerSolutionTools(server: McpServer, registry: EnvironmentRe
       } catch (error: any) {
         console.error("Error getting publishers:", error);
         return {
+          structuredContent: { publishers: [] },
           content: [
             {
               type: "text",
@@ -79,6 +80,7 @@ export function registerSolutionTools(server: McpServer, registry: EnvironmentRe
       } catch (error: any) {
         console.error("Error getting solutions:", error);
         return {
+          structuredContent: { solutions: [] },
           content: [
             {
               type: "text",
@@ -113,6 +115,7 @@ export function registerSolutionTools(server: McpServer, registry: EnvironmentRe
 
         if (!solution) {
           return {
+            structuredContent: { uniqueName, solution: null },
             content: [
               {
                 type: "text",
@@ -134,6 +137,7 @@ export function registerSolutionTools(server: McpServer, registry: EnvironmentRe
       } catch (error: any) {
         console.error("Error getting solution:", error);
         return {
+          structuredContent: { uniqueName, solution: null },
           content: [
             {
               type: "text",
@@ -178,6 +182,7 @@ export function registerSolutionTools(server: McpServer, registry: EnvironmentRe
       } catch (error: any) {
         console.error("Error getting solution components:", error);
         return {
+          structuredContent: { solutionUniqueName, components: [] },
           content: [
             {
               type: "text",
@@ -228,6 +233,7 @@ export function registerSolutionTools(server: McpServer, registry: EnvironmentRe
       } catch (error: any) {
         console.error("Error adding solution component:", error);
         return {
+          structuredContent: { solutionUniqueName, componentId, result: null },
           content: [
             {
               type: "text",
@@ -314,6 +320,7 @@ export function registerSolutionTools(server: McpServer, registry: EnvironmentRe
       } catch (error: any) {
         console.error("Error exporting solution:", error);
         return {
+          structuredContent: { solutionName, exportResult: null },
           content: [
             {
               type: "text",
@@ -349,7 +356,10 @@ export function registerSolutionTools(server: McpServer, registry: EnvironmentRe
         };
       } catch (error: any) {
         console.error("Error updating solution version:", error);
-        return { content: [{ type: "text", text: `Failed to update solution version: ${error.message}` }] };
+        return {
+          structuredContent: { uniqueName, solutionId: "", version },
+          content: [{ type: "text", text: `Failed to update solution version: ${error.message}` }],
+        };
       }
     }
   );
@@ -381,7 +391,10 @@ export function registerSolutionTools(server: McpServer, registry: EnvironmentRe
         };
       } catch (error: any) {
         console.error("Error creating solution:", error);
-        return { content: [{ type: "text", text: `Failed to create solution: ${error.message}` }] };
+        return {
+          structuredContent: { uniqueName, solutionId: "" },
+          content: [{ type: "text", text: `Failed to create solution: ${error.message}` }],
+        };
       }
     }
   );
