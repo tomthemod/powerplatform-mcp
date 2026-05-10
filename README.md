@@ -232,7 +232,7 @@ Tous les outils acceptent un paramètre optionnel `environment` pour cibler un e
 | 🆕 `create-cloud-flow` | Créer un cloud flow en Draft | `name`, `clientData` | `primaryEntity`, `solutionName` |
 | 🆕 `set-flow-state` | Activer/désactiver un cloud flow | `flowId`, `activate` | |
 
-### Workflows classiques + Business Rules
+### Workflows classiques + Business Rules + BPF
 
 | Outil | Description | Paramètres requis | Optionnels |
 |---|---|---|---|
@@ -241,6 +241,10 @@ Tous les outils acceptent un paramètre optionnel `environment` pour cibler un e
 | `get-ootb-workflows` | Workflows out-of-the-box (background, BPF, actions, on-demand) | | `maxRecords`, `categories` |
 | `get-business-rules` | Business rules | | `activeOnly`, `maxRecords` |
 | `get-business-rule` | Business rule + XAML | `workflowId` | |
+| 🆕 `get-business-rule-summary` | Parse le XAML d'une BR → entité, attributs/contrôles référencés, conditions (avec descriptions humaines), actions (`SetVisibility`, `SetAttributeValue`, `SetBusinessRequired`, etc.). Utile pour préparer une copie cross-entité dans le maker portal. | `workflowId` | |
+| 🆕 `get-bpf` | Business Process Flow + `clientdata` parsé en arborescence (stages, fields par stage, branches conditionnelles via `__class` discriminator). | `workflowId` | `includeRaw` |
+
+> ⚠️ **Édition programmatique des BPF et Business Rules non supportée**. Le `xaml` est régénéré côté Dataverse au PATCH du `clientdata` — pas d'API publique pour synthétiser un xaml cohérent. Voie supportée = maker portal. Les outils ci-dessus sont en lecture seule pour préparer les modifs manuelles.
 
 ### Web Resources
 
@@ -348,6 +352,11 @@ set-view-columns <entityName> <viewId> col1:120 col2:200 [--order-by ...]
 pac-auth                                   # Authentifie pac CLI avec les credentials
 generate-models <outdir>                   # Early-bound depuis le schéma
 deploy-plugin <pluginFile> --plugin-id <id>
+
+# Workflows / BR / BPF
+business-rule <workflowId>                  # XAML brut de la BR
+business-rule-summary <workflowId>          # 🆕 BR parsée (conditions, actions, attributs)
+bpf <workflowId> [--raw]                    # 🆕 BPF parsé (stages, fields, branches)
 ```
 
 La liste complète est dans `src/cli/commands/` (un fichier par domaine).
