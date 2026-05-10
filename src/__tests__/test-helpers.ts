@@ -34,5 +34,6 @@ export function createBusinessRuleService() { return getRegistry().getContext().
 export function createFlowService() { return getRegistry().getContext().getFlowService(); }
 export function createSolutionService() { return getRegistry().getContext().getSolutionService(); }
 export function createWorkflowService() { return getRegistry().getContext().getWorkflowService(); }
+export function createBpfService() { return getRegistry().getContext().getBpfService(); }
 export function createConfigurationService() { return getRegistry().getContext().getConfigurationService(); }
 export function createSecurityRoleService() { return getRegistry().getContext().getSecurityRoleService(); }

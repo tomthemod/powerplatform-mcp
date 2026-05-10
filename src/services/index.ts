@@ -8,6 +8,7 @@ export { BusinessRuleService } from './businessrule-service.js';
 export { FlowService } from './flow-service.js';
 export { SolutionService } from './solution-service.js';
 export { WorkflowService } from './workflow-service.js';
+export { BpfService } from './bpf-service.js';
 export { ConfigurationService } from './configuration-service.js';
 export { SecurityRoleService } from './security-role-service.js';
 export { ServiceEndpointService } from './service-endpoint-service.js';

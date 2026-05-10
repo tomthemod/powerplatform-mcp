@@ -111,4 +111,126 @@ export class BusinessRuleService {
       xaml: businessRule.xaml,
     };
   }
+
+  /**
+   * Get a structured summary of a business rule (parsed from xaml).
+   *
+   * Useful for cross-entity copy: gives the primary entity, all referenced
+   * attributes/controls, conditions (with their descriptions) and actions
+   * (SetVisibility, SetAttributeValue, SetBusinessRequired, ...) — enough to
+   * reproduce the rule manually in the maker portal pointing at a different
+   * entity's equivalent attributes.
+   */
+  async getBusinessRuleSummary(workflowId: string): Promise<{
+    workflowid: string;
+    name: string;
+    primaryEntity: string | null;
+    state: string;
+    isManaged: boolean;
+    attributesReferenced: string[];
+    controlsReferenced: string[];
+    conditions: { description: string | null; operator: string | null }[];
+    actions: { type: string; controlId?: string; attribute?: string; isVisible?: boolean; value?: string; displayName?: string }[];
+    rawXamlSize: number;
+  }> {
+    const br = (await this.getBusinessRule(workflowId)) as Record<string, unknown>;
+    const xaml = (br.xaml as string) ?? '';
+
+    return {
+      workflowid: br.workflowid as string,
+      name: br.name as string,
+      primaryEntity: (br.primaryEntity as string) ?? null,
+      state: br.state as string,
+      isManaged: Boolean(br.isManaged),
+      ...this.parseBusinessRuleXaml(xaml),
+      rawXamlSize: xaml.length,
+    };
+  }
+
+  /**
+   * Extract conditions, actions and referenced attributes/controls from BR xaml.
+   *
+   * The xaml structure uses:
+   *   - <mxswa:GetEntityProperty Attribute="x" EntityName="y" Value="..."/>  → read attribute
+   *   - <mxswa:ActivityReference DisplayName="ConditionBranchStep<N>"> with
+   *     <x:String x:Key="Description">human label</x:String>            → branch
+   *     ConditionOperator (NotNull, Equal, NotEqual, GreaterThan, ...)
+   *   - <mcwc:SetVisibility ControlId="x" IsVisible="True|False"/>      → action
+   *   - <mcwc:SetAttributeValue Attribute="x" Value="..."/>             → action
+   *   - <mxswa:ActivityReference DisplayName="SetBusinessRequiredStep<N>"...>  → action
+   */
+  parseBusinessRuleXaml(xaml: string): {
+    attributesReferenced: string[];
+    controlsReferenced: string[];
+    conditions: { description: string | null; operator: string | null }[];
+    actions: { type: string; controlId?: string; attribute?: string; isVisible?: boolean; value?: string; displayName?: string }[];
+  } {
+    const attrs = new Set<string>();
+    const controls = new Set<string>();
+
+    for (const m of xaml.matchAll(/Attribute="([^"]+)"/g)) attrs.add(m[1]);
+    for (const m of xaml.matchAll(/ControlId="([^"]+)"/g)) controls.add(m[1]);
+
+    // Pull descriptions and operators globally — branches are nested with inner
+    // ActivityReference end tags that defeat per-block extraction. The two lists
+    // are presented in document order; correlation is left to the reader.
+    const descriptions = [...xaml.matchAll(/<x:String x:Key="Description">([^<]*)<\/x:String>/g)]
+      .map((m) => m[1])
+      .filter((d) => d.length > 0);
+    const operators = [...xaml.matchAll(/x:Key="ConditionOperator">([^<]+)</g)].map((m) => m[1]);
+    const conditions: { description: string | null; operator: string | null }[] = [];
+    const maxLen = Math.max(descriptions.length, operators.length);
+    for (let i = 0; i < maxLen; i++) {
+      conditions.push({
+        description: descriptions[i] ?? null,
+        operator: operators[i] ?? null,
+      });
+    }
+
+    const actions: { type: string; controlId?: string; attribute?: string; isVisible?: boolean; value?: string; displayName?: string }[] = [];
+
+    for (const m of xaml.matchAll(/<mcwc:SetVisibility([^/]*?)\/>/g)) {
+      const tag = m[1];
+      actions.push({
+        type: 'SetVisibility',
+        controlId: extractAttr(tag, 'ControlId'),
+        isVisible: extractAttr(tag, 'IsVisible')?.toLowerCase() === 'true',
+      });
+    }
+    for (const m of xaml.matchAll(/<mcwc:SetAttributeValue([^/]*?)\/>/g)) {
+      const tag = m[1];
+      actions.push({
+        type: 'SetAttributeValue',
+        attribute: extractAttr(tag, 'Attribute'),
+        value: extractAttr(tag, 'Value'),
+      });
+    }
+    for (const m of xaml.matchAll(/DisplayName="(SetBusinessRequiredStep\d+:?[^"]*)">/g)) {
+      actions.push({ type: 'SetBusinessRequired', displayName: m[1] });
+    }
+    for (const m of xaml.matchAll(/DisplayName="(SetBusinessRecommendedStep\d+:?[^"]*)">/g)) {
+      actions.push({ type: 'SetBusinessRecommended', displayName: m[1] });
+    }
+    for (const m of xaml.matchAll(/DisplayName="(SetDefaultValueStep\d+:?[^"]*)">/g)) {
+      actions.push({ type: 'SetDefaultValue', displayName: m[1] });
+    }
+    for (const m of xaml.matchAll(/DisplayName="(LockStep\d+:?[^"]*)">/g)) {
+      actions.push({ type: 'Lock', displayName: m[1] });
+    }
+    for (const m of xaml.matchAll(/DisplayName="(ShowErrorMessageStep\d+:?[^"]*)">/g)) {
+      actions.push({ type: 'ShowErrorMessage', displayName: m[1] });
+    }
+
+    return {
+      attributesReferenced: Array.from(attrs).sort(),
+      controlsReferenced: Array.from(controls).sort(),
+      conditions,
+      actions,
+    };
+  }
+}
+
+function extractAttr(tag: string, name: string): string | undefined {
+  const m = tag.match(new RegExp(`${name}="([^"]*)"`));
+  return m?.[1];
 }

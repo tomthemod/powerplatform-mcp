@@ -59,4 +59,42 @@ export function registerBusinessRuleCommands(program: Command, registry: Environ
         ].filter(Boolean).join('\n'),
       }, ctx.environmentName);
     });
+
+  program
+    .command('business-rule-summary <workflowId>')
+    .description('Parse a business rule xaml into structured conditions/actions/attribute references')
+    .action(async (workflowId: string, _opts: unknown, command: Command) => {
+      const ctx = registry.getContext(command.optsWithGlobals().env);
+      const service = ctx.getBusinessRuleService();
+      const r = await service.getBusinessRuleSummary(workflowId);
+
+      const condLines = r.conditions
+        .map((c, i) => `    ${i + 1}. ${c.description ?? '(no description)'} [${c.operator ?? '?'}]`)
+        .join('\n');
+      const actionLines = r.actions
+        .map((a, i) => {
+          const detail = a.controlId
+            ? `${a.controlId} → isVisible=${a.isVisible}`
+            : a.attribute
+              ? `${a.attribute} = ${a.value ?? ''}`
+              : (a.displayName ?? '');
+          return `    ${i + 1}. ${a.type}: ${detail}`;
+        })
+        .join('\n');
+
+      outputResult({
+        fileName: `business-rule-${workflowId}-summary`,
+        data: r,
+        summary: [
+          `Business Rule: ${r.name}`,
+          `  Entity: ${r.primaryEntity} | State: ${r.state} | Managed: ${r.isManaged}`,
+          `  Attributes referenced (${r.attributesReferenced.length}): ${r.attributesReferenced.join(', ')}`,
+          `  Controls referenced (${r.controlsReferenced.length}): ${r.controlsReferenced.join(', ')}`,
+          `  Conditions (${r.conditions.length}):`,
+          condLines,
+          `  Actions (${r.actions.length}):`,
+          actionLines,
+        ].filter(Boolean).join('\n'),
+      }, ctx.environmentName);
+    });
 }

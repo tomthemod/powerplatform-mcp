@@ -7,6 +7,7 @@ import { registerRecordCommands } from './record-commands.js';
 import { registerFlowCommands } from './flow-commands.js';
 import { registerSolutionCommands } from './solution-commands.js';
 import { registerWorkflowCommands } from './workflow-commands.js';
+import { registerBpfCommands } from './bpf-commands.js';
 import { registerBusinessRuleCommands } from './businessrule-commands.js';
 import { registerOptionSetCommands } from './optionset-commands.js';
 import { registerDependencyCommands } from './dependency-commands.js';
@@ -25,6 +26,7 @@ export function registerAllCommands(program: Command, registry: EnvironmentRegis
   registerFlowCommands(program, registry);
   registerSolutionCommands(program, registry);
   registerWorkflowCommands(program, registry);
+  registerBpfCommands(program, registry);
   registerBusinessRuleCommands(program, registry);
   registerOptionSetCommands(program, registry);
   registerDependencyCommands(program, registry);

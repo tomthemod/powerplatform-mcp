@@ -8,6 +8,7 @@ import type { BusinessRuleService } from "./services/businessrule-service.js";
 import type { FlowService } from "./services/flow-service.js";
 import type { SolutionService } from "./services/solution-service.js";
 import type { WorkflowService } from "./services/workflow-service.js";
+import type { BpfService } from "./services/bpf-service.js";
 import type { ConfigurationService } from "./services/configuration-service.js";
 import type { SecurityRoleService } from "./services/security-role-service.js";
 import type { ServiceEndpointService } from "./services/service-endpoint-service.js";
@@ -30,6 +31,7 @@ export interface ServiceContext {
   getFlowService: () => FlowService;
   getSolutionService: () => SolutionService;
   getWorkflowService: () => WorkflowService;
+  getBpfService: () => BpfService;
   getConfigurationService: () => ConfigurationService;
   getSecurityRoleService: () => SecurityRoleService;
   getServiceEndpointService: () => ServiceEndpointService;

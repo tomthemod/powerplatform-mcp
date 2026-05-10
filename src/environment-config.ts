@@ -11,6 +11,7 @@ import {
   FlowService,
   SolutionService,
   WorkflowService,
+  BpfService,
   ConfigurationService,
   SecurityRoleService,
   ServiceEndpointService,
@@ -143,6 +144,7 @@ export class EnvironmentRegistry {
     let flowService: FlowService | null = null;
     let solutionService: SolutionService | null = null;
     let workflowService: WorkflowService | null = null;
+    let bpfService: BpfService | null = null;
     let configurationService: ConfigurationService | null = null;
     let securityRoleService: SecurityRoleService | null = null;
     let serviceEndpointService: ServiceEndpointService | null = null;
@@ -161,6 +163,7 @@ export class EnvironmentRegistry {
       getFlowService: () => (flowService ??= new FlowService(getClient())),
       getSolutionService: () => (solutionService ??= new SolutionService(getClient())),
       getWorkflowService: () => (workflowService ??= new WorkflowService(getClient())),
+      getBpfService: () => (bpfService ??= new BpfService(getClient())),
       getConfigurationService: () => (configurationService ??= new ConfigurationService(getClient())),
       getSecurityRoleService: () => {
         const solutionSvc = (solutionService ??= new SolutionService(getClient()));
