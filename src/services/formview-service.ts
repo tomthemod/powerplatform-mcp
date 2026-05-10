@@ -26,6 +26,34 @@ export interface ViewSummary {
 export class FormViewService {
   constructor(private client: PowerPlatformClient) {}
 
+  /**
+   * Throws if the form is not customizable. Must be called BEFORE any PATCH to systemforms.formxml.
+   *
+   * On managed Microsoft forms (ismanaged=true and iscustomizable.Value=false), Dataverse accepts
+   * the PATCH with 204 No Content but silently ignores it: the formxml is stored in an inert base
+   * layer and runtime UCI keeps consuming the active Microsoft layer. A subsequent GET on the
+   * formxml returns the patched value, so post-PATCH verification cannot detect the silent failure.
+   * The only reliable signal is the pre-PATCH iscustomizable.Value flag.
+   */
+  private async assertFormCustomizable(formId: string, operation: string): Promise<void> {
+    const form = await this.client.get<{
+      name?: string;
+      ismanaged?: boolean;
+      iscustomizable?: { Value: boolean };
+    }>(`api/data/v9.2/systemforms(${formId})?$select=name,ismanaged,iscustomizable`);
+
+    if (!form.iscustomizable?.Value) {
+      const formName = form.name ?? '(unnamed)';
+      throw new Error(
+        `Form '${formName}' (${formId}) is not customizable ` +
+        `(ismanaged=${form.ismanaged}, iscustomizable.Value=${form.iscustomizable?.Value}). ` +
+        `Operation '${operation}' would be silently ignored by Dataverse on managed forms — ` +
+        `aborting before the PATCH. Open the form in Power Apps maker and apply the change manually, ` +
+        `then publish. To unlock automation, create an unmanaged customization layer first.`,
+      );
+    }
+  }
+
   // ─── FORMS ─────────────────────────────────────────────────────────────────
 
   /**
@@ -71,6 +99,7 @@ export class FormViewService {
    * @param entityLogicalName Used only for publishing after the change
    */
   async addFormField(formId: string, attributeName: string, entityLogicalName: string): Promise<{ added: boolean }> {
+    await this.assertFormCustomizable(formId, 'addFormField');
     const form = await this.client.get<{ formxml: string }>(
       `api/data/v9.2/systemforms(${formId})?$select=formxml`,
     );
@@ -123,6 +152,7 @@ export class FormViewService {
     position: 'before' | 'after',
     entityLogicalName: string,
   ): Promise<{ added: boolean }> {
+    await this.assertFormCustomizable(formId, 'addFormFieldRelative');
     const form = await this.client.get<{ formxml: string }>(
       `api/data/v9.2/systemforms(${formId})?$select=formxml`,
     );
@@ -165,6 +195,7 @@ export class FormViewService {
    * @param entityLogicalName Used only for publishing after the change
    */
   async removeFormField(formId: string, attributeName: string, entityLogicalName: string): Promise<{ removed: boolean }> {
+    await this.assertFormCustomizable(formId, 'removeFormField');
     const form = await this.client.get<{ formxml: string }>(
       `api/data/v9.2/systemforms(${formId})?$select=formxml`,
     );
@@ -203,6 +234,7 @@ export class FormViewService {
     libraryName: string,
     entityLogicalName: string,
   ): Promise<{ added: boolean }> {
+    await this.assertFormCustomizable(formId, 'addFormLibrary');
     // Resolve the web resource id by name.
     const wr = await this.client.get<ApiCollectionResponse<{ webresourceid: string }>>(
       `api/data/v9.2/webresourceset?$filter=name eq '${libraryName}'&$select=webresourceid&$top=1`,
@@ -253,6 +285,7 @@ export class FormViewService {
     force: boolean,
     entityLogicalName: string,
   ): Promise<{ removed: boolean }> {
+    await this.assertFormCustomizable(formId, 'removeFormLibrary');
     const form = await this.client.get<{ formxml: string }>(
       `api/data/v9.2/systemforms(${formId})?$select=formxml`,
     );
@@ -319,6 +352,7 @@ export class FormViewService {
     if (eventName === 'onchange' && !attributeName) {
       throw new Error("`attributeName` is required for 'onchange' events.");
     }
+    await this.assertFormCustomizable(formId, 'addFormEventHandler');
     if (eventName !== 'onchange' && attributeName) {
       throw new Error(`'${eventName}' is a form-level event — do not pass attributeName.`);
     }
@@ -442,6 +476,7 @@ export class FormViewService {
     libraryName: string | undefined,
     entityLogicalName: string,
   ): Promise<{ removed: boolean }> {
+    await this.assertFormCustomizable(formId, 'removeFormEventHandler');
     const form = await this.client.get<{ formxml: string }>(
       `api/data/v9.2/systemforms(${formId})?$select=formxml`,
     );
@@ -493,6 +528,7 @@ export class FormViewService {
     customParameters: string | undefined,
     entityLogicalName: string,
   ): Promise<{ added: boolean }> {
+    await this.assertFormCustomizable(formId, 'addFormPcfControl');
     const form = await this.client.get<{ formxml: string }>(
       `api/data/v9.2/systemforms(${formId})?$select=formxml`,
     );
@@ -542,6 +578,7 @@ export class FormViewService {
     attributeName: string,
     entityLogicalName: string,
   ): Promise<{ removed: boolean }> {
+    await this.assertFormCustomizable(formId, 'removeFormPcfControl');
     const form = await this.client.get<{ formxml: string }>(
       `api/data/v9.2/systemforms(${formId})?$select=formxml`,
     );
