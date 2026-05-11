@@ -252,10 +252,12 @@ Tous les outils acceptent un paramètre optionnel `environment` pour cibler un e
 |---|---|---|---|
 | `get-web-resources` | Lister les web resources | | `maxRecords`, `webResourceType`, `nameFilter` |
 | `get-web-resource` | Web resource par nom | `name` | |
-| `create-web-resource` | Créer une web resource | `name`, `displayName`, `webResourceType`, `content` | `description`, `solutionName` |
-| 🆕 `update-web-resource` | Mettre à jour le contenu d'une web resource existante | `webResourceId`, `content` | `solutionName` |
-| 🆕 `upsert-web-resource` | Créer ou mettre à jour (idempotent par nom) | `name`, `displayName`, `webResourceType`, `content` | `description`, `solutionName` |
+| `create-web-resource` | Créer une web resource | `name`, `displayName`, `webResourceType`, + (`content` **OU** `filePath`) | `description`, `solutionName` |
+| 🆕 `update-web-resource` | Mettre à jour le contenu d'une web resource existante | `webResourceId`, + (`content` **OU** `filePath`) | `solutionName` |
+| 🆕 `upsert-web-resource` | Créer ou mettre à jour (idempotent par nom) | `name`, `displayName`, `webResourceType`, + (`content` **OU** `filePath`) | `description`, `solutionName` |
 | 🆕 `delete-web-resource` | Supprimer une web resource (irréversible) | `webResourceId` | |
+
+> ⚠️ **`content` vs `filePath` (create / update / upsert web resource)** : fournir **exactement un des deux**. `content` = chaîne base64 inline (legacy, force l'appelant — typiquement un LLM — à re-générer tout le contenu en sortie). `filePath` = chemin absolu sur disque, lu et base64-encodé côté serveur — **à préférer pour tout JS/CSS de plus de quelques Ko**, évite la regénération coûteuse côté modèle. Les deux ensemble = erreur. Aucun des deux = erreur.
 
 ### Configuration (env vars + connection refs)
 

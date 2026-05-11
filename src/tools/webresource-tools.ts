@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { EnvironmentRegistry } from "../environment-config.js";
+import { resolveWebResourceContent } from "../services/webresource-service.js";
 
 /**
  * Register web resource tools with the MCP server.
@@ -116,12 +117,13 @@ export function registerWebResourceTools(server: McpServer, registry: Environmen
     "create-web-resource",
     {
       title: "Create Web Resource",
-      description: "Create a new web resource in a PowerPlatform environment. Content must be base64-encoded.",
+      description: "Create a new web resource in a PowerPlatform environment. Provide either `content` (base64) or `filePath` (absolute path read & base64-encoded server-side).",
       inputSchema: {
         name: z.string().describe("The name of the web resource (e.g. 'prefix_/scripts/main.js')"),
         displayName: z.string().describe("The display name of the web resource"),
         webResourceType: z.number().describe("Web resource type (1=HTML, 2=CSS, 3=JavaScript, 4=XML, 5=PNG, 6=JPG, 7=GIF, 8=Silverlight, 9=StyleSheet, 10=ICO, 11=Vector, 12=SVG)"),
-        content: z.string().describe("The base64-encoded content of the web resource"),
+        content: z.string().optional().describe("The base64-encoded content of the web resource. Mutually exclusive with `filePath`."),
+        filePath: z.string().optional().describe("Absolute path to the source file on disk. Read & base64-encoded server-side. Prefer this for large files — avoids forcing the caller to emit the full base64 payload. Mutually exclusive with `content`."),
         description: z.string().optional().describe("Description of the web resource"),
         solutionName: z.string().optional().describe("Solution unique name to add the component to. Dynamics derives it from the display name by removing spaces, dashes, special characters, and accented letters (e.g. '20260501 - Service Commercial évolutions #1' → '20260501ServiceCommercialvolutions1')"),
         environment: z.string().optional().describe("Environment name (e.g. DEV, UAT). Uses default if omitted."),
@@ -131,12 +133,13 @@ export function registerWebResourceTools(server: McpServer, registry: Environmen
         webResourceId: z.string(),
       }),
     },
-    async ({ name, displayName, webResourceType, content, description, solutionName, environment }) => {
+    async ({ name, displayName, webResourceType, content, filePath, description, solutionName, environment }) => {
       try {
         const ctx = registry.getContext(environment);
         const service = ctx.getWebResourceService();
+        const resolvedContent = await resolveWebResourceContent({ content, filePath });
         const result = await service.createWebResource({
-          name, displayName, webResourceType, content, description, solutionName,
+          name, displayName, webResourceType, content: resolvedContent, description, solutionName,
         });
 
         return {
@@ -168,19 +171,21 @@ export function registerWebResourceTools(server: McpServer, registry: Environmen
     "update-web-resource",
     {
       title: "Update Web Resource",
-      description: "Update an existing web resource's content (base64-encoded). Only `content` is touched; display name/type are left alone.",
+      description: "Update an existing web resource's content. Provide either `content` (base64) or `filePath` (absolute path read & base64-encoded server-side — preferred for large files). Only the content field is touched; display name/type are left alone.",
       inputSchema: {
         webResourceId: z.string().describe("The GUID of the existing web resource"),
-        content: z.string().describe("Base64-encoded new content"),
+        content: z.string().optional().describe("Base64-encoded new content. Mutually exclusive with `filePath`."),
+        filePath: z.string().optional().describe("Absolute path to the source file on disk. Read & base64-encoded server-side. Mutually exclusive with `content`."),
         solutionName: z.string().optional(),
         environment: z.string().optional(),
       },
     },
-    async ({ webResourceId, content, solutionName, environment }) => {
+    async ({ webResourceId, content, filePath, solutionName, environment }) => {
       try {
         const ctx = registry.getContext(environment);
         const service = ctx.getWebResourceService();
-        await service.updateWebResource(webResourceId, content, solutionName);
+        const resolvedContent = await resolveWebResourceContent({ content, filePath });
+        await service.updateWebResource(webResourceId, resolvedContent, solutionName);
         return { content: [{ type: "text", text: `Updated web resource ${webResourceId}` }] };
       } catch (error: any) {
         console.error("Error updating web resource:", error);
@@ -218,23 +223,25 @@ export function registerWebResourceTools(server: McpServer, registry: Environmen
     "upsert-web-resource",
     {
       title: "Upsert Web Resource",
-      description: "Create a new web resource, or update the content of an existing one with the same name. Idempotent across re-runs.",
+      description: "Create a new web resource, or update the content of an existing one with the same name. Idempotent across re-runs. Provide either `content` (base64) or `filePath` (preferred for large files).",
       inputSchema: {
         name: z.string(),
         displayName: z.string(),
         webResourceType: z.number().describe("1=HTML, 2=CSS, 3=JS, 4=XML, 5=PNG, 6=JPG, 7=GIF, 9=XSL, 10=ICO, 11=SVG, 12=RESX"),
-        content: z.string().describe("Base64-encoded content"),
+        content: z.string().optional().describe("Base64-encoded content. Mutually exclusive with `filePath`."),
+        filePath: z.string().optional().describe("Absolute path to the source file on disk. Read & base64-encoded server-side. Mutually exclusive with `content`."),
         description: z.string().optional(),
         solutionName: z.string().optional(),
         environment: z.string().optional(),
       },
       outputSchema: z.object({ name: z.string(), webResourceId: z.string(), created: z.boolean() }),
     },
-    async ({ name, displayName, webResourceType, content, description, solutionName, environment }) => {
+    async ({ name, displayName, webResourceType, content, filePath, description, solutionName, environment }) => {
       try {
         const ctx = registry.getContext(environment);
         const service = ctx.getWebResourceService();
-        const result = await service.upsertWebResource({ name, displayName, webResourceType, content, description, solutionName });
+        const resolvedContent = await resolveWebResourceContent({ content, filePath });
+        const result = await service.upsertWebResource({ name, displayName, webResourceType, content: resolvedContent, description, solutionName });
         return {
           structuredContent: { name, webResourceId: result.webResourceId, created: result.created },
           content: [{ type: "text", text: `${result.created ? 'Created' : 'Updated'} web resource '${name}' (ID: ${result.webResourceId})` }],

@@ -1,5 +1,32 @@
+import { readFile } from 'node:fs/promises';
 import { PowerPlatformClient } from '../powerplatform-client.js';
 import type { ApiCollectionResponse } from '../models/index.js';
+
+/**
+ * Resolve web resource content from either inline base64 (`content`) or an
+ * on-disk file path (`filePath`). The `filePath` form avoids forcing the
+ * caller (typically a model) to regenerate the entire file contents in its
+ * output just to upload it — large JS web resources are read straight from
+ * disk and base64-encoded server-side. Exactly one of the two must be set.
+ */
+export async function resolveWebResourceContent(input: {
+  content?: string;
+  filePath?: string;
+}): Promise<string> {
+  const hasContent = typeof input.content === 'string' && input.content.length > 0;
+  const hasFilePath = typeof input.filePath === 'string' && input.filePath.length > 0;
+  if (hasContent && hasFilePath) {
+    throw new Error("Provide either 'content' (base64) or 'filePath' — not both.");
+  }
+  if (!hasContent && !hasFilePath) {
+    throw new Error("One of 'content' (base64) or 'filePath' is required.");
+  }
+  if (hasContent) {
+    return input.content as string;
+  }
+  const buf = await readFile(input.filePath as string);
+  return buf.toString('base64');
+}
 
 /**
  * Service for web resource operations.
