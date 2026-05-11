@@ -374,42 +374,41 @@ export class FormViewService {
     const handlerXml = `<Handler functionName="${functionName}" libraryName="${libraryName}" enabled="true" parameters="${parameters}" passExecutionContext="${passExecutionContext}" />`;
 
     if (eventName === 'onchange') {
-      // Locate the <control datafieldname="X">...</control> block.
-      const escaped = attributeName!.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      // Two-pass match: self-closing first (`<control ... />`), then open-form (`<control ...>...</control>`).
-      // The combined optional-(?:[\s\S]*?<\/control>)? pattern over-extends on large formXML when the
-      // control is self-closing, because the optional group greedily consumes up to the next </control>.
-      const selfClosingRegex = new RegExp(`<control[^>]*datafieldname="${escaped}"[^>]*/>`,'i');
-      const openControlRegex = new RegExp(`<control[^>]*datafieldname="${escaped}"[^>]*>[\\s\\S]*?<\\/control>`, 'i');
-      const controlMatch = xml.match(selfClosingRegex) ?? xml.match(openControlRegex);
-      if (!controlMatch) {
+      // Dataverse formxml stores field-level onchange handlers in the FORM-LEVEL <events> block,
+      // under <event name="onchange" attribute="fieldname"> — NOT inside the <control> element.
+      // Schema validation rejects <events> as a child of <control>.
+      const escapedAttr = attributeName!.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+      // Verify the field is on the form (control present) before touching events.
+      const controlCheck = new RegExp(`datafieldname="${escapedAttr}"`, 'i');
+      if (!controlCheck.test(xml)) {
         throw new Error(`Field '${attributeName}' is not on form ${formId} — add it first via add-form-field.`);
       }
 
-      let updated = controlMatch[0];
-      const isSelfClosing = updated.trimEnd().endsWith('/>');
-      if (isSelfClosing) {
-        // Convert `<control ... />` → `<control ...><events>...</events></control>`
-        const openTag = updated.replace(/\s*\/>\s*$/, '>');
-        updated = `${openTag}<events><event name="onchange"><Handlers>${handlerXml}</Handlers></event></events></control>`;
-      } else {
-        // Already has a body. Look for an existing <events> block.
-        if (/<events>[\s\S]*?<\/events>/i.test(updated)) {
-          // Merge into existing events block.
-          updated = updated.replace(/<events>([\s\S]*?)<\/events>/i, (_, inner) => {
-            if (/<event\s+name="onchange"[^>]*>[\s\S]*?<\/event>/i.test(inner)) {
-              // onchange event exists — inject handler into Handlers
-              const newInner = inner.replace(/(<event\s+name="onchange"[^>]*>[\s\S]*?<Handlers>)([\s\S]*?)(<\/Handlers>)/i, `$1$2${handlerXml}$3`);
-              return `<events>${newInner}</events>`;
-            }
-            return `<events>${inner}<event name="onchange"><Handlers>${handlerXml}</Handlers></event></events>`;
-          });
-        } else {
-          // No <events> yet, inject just before </control>
-          updated = updated.replace(/<\/control>$/, `<events><event name="onchange"><Handlers>${handlerXml}</Handlers></event></events></control>`);
-        }
+      // Find the last </events> in the document (= the form-level events block, after all tabs/controls).
+      const lastEventsCloseIdx = xml.lastIndexOf('</events>');
+      if (lastEventsCloseIdx < 0) {
+        throw new Error('Form xml does not contain a form-level <events> block — unexpected structure.');
       }
-      xml = xml.replace(controlMatch[0], updated);
+
+      // Look for an existing <event name="onchange" ... attribute="fieldname"> block.
+      const existingEventRegex = new RegExp(
+        `(<event[^>]*name="onchange"[^>]*attribute="${escapedAttr}"[^>]*>)([\\s\\S]*?)(<\\/event>)`,
+        'i',
+      );
+      if (existingEventRegex.test(xml)) {
+        // Inject handler into existing <Handlers> block.
+        xml = xml.replace(existingEventRegex, (_, open, inner, close) => {
+          const newInner = inner.replace(/(<Handlers>)([\s\S]*?)(<\/Handlers>)/i, `$1$2${handlerXml}$3`);
+          return `${open}${newInner}${close}`;
+        });
+      } else {
+        // Insert a new <event> just before the last </events>.
+        const handlerUniqueId = `{${randomUUID().toUpperCase()}}`;
+        const hXml = handlerXml.replace('/>', ` handlerUniqueId="${handlerUniqueId}" />`);
+        const newEvent = `<event name="onchange" active="true" application="true" attribute="${attributeName}"><Handlers>${hXml}</Handlers></event>`;
+        xml = xml.substring(0, lastEventsCloseIdx) + newEvent + xml.substring(lastEventsCloseIdx);
+      }
     } else {
       // Form-level event: onload / onsave under <form>/<events>.
       // Look for an existing top-level <events> block (one that closes with </events> at form root, not nested).
