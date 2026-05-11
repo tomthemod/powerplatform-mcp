@@ -376,8 +376,12 @@ export class FormViewService {
     if (eventName === 'onchange') {
       // Locate the <control datafieldname="X">...</control> block.
       const escaped = attributeName!.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const controlRegex = new RegExp(`<control[^>]*datafieldname="${escaped}"[^>]*>(?:[\\s\\S]*?<\\/control>)?`, 'i');
-      const controlMatch = xml.match(controlRegex);
+      // Two-pass match: self-closing first (`<control ... />`), then open-form (`<control ...>...</control>`).
+      // The combined optional-(?:[\s\S]*?<\/control>)? pattern over-extends on large formXML when the
+      // control is self-closing, because the optional group greedily consumes up to the next </control>.
+      const selfClosingRegex = new RegExp(`<control[^>]*datafieldname="${escaped}"[^>]*/>`,'i');
+      const openControlRegex = new RegExp(`<control[^>]*datafieldname="${escaped}"[^>]*>[\\s\\S]*?<\\/control>`, 'i');
+      const controlMatch = xml.match(selfClosingRegex) ?? xml.match(openControlRegex);
       if (!controlMatch) {
         throw new Error(`Field '${attributeName}' is not on form ${formId} — add it first via add-form-field.`);
       }
