@@ -165,8 +165,8 @@ Tous les outils acceptent un paramètre optionnel `environment` pour cibler un e
 |---|---|---|---|
 | 🆕 `get-entity-forms` | Lister les formulaires d'une entité | `entityLogicalName` | `type` (2=Main, 5=QuickView, 6=QuickCreate, 7=Dashboard) |
 | 🆕 `get-form-fields` | Champs présents sur un formulaire | `formId` | |
-| 🆕 `add-form-field` | Ajouter un champ en bas de la 1re section | `entityLogicalName`, `formId`, `attributeName` | |
-| 🆕 `add-form-field-relative` | Ajouter un champ avant/après un champ existant | `entityLogicalName`, `formId`, `attributeName`, `relativeToField`, `position` (`before`/`after`) | |
+| 🆕 `add-form-field` | Ajouter un champ en bas de la 1re section (classid auto-résolu selon le type Dataverse : Lookup, DateTime, Boolean, Picklist, Memo, etc.) | `entityLogicalName`, `formId`, `attributeName` | |
+| 🆕 `add-form-field-relative` | Ajouter un champ avant/après un champ existant (classid auto-résolu selon le type) | `entityLogicalName`, `formId`, `attributeName`, `relativeToField`, `position` (`before`/`after`) | |
 | 🆕 `remove-form-field` | Retirer un champ d'un formulaire | `entityLogicalName`, `formId`, `attributeName` | |
 | 🆕 `add-form-library` | Inscrire une web resource JS dans `<formLibraries>` | `entityLogicalName`, `formId`, `libraryName` | |
 | 🆕 `remove-form-library` | Désinscrire une library (refuse si handlers la référencent, sauf `force=true`) | `entityLogicalName`, `formId`, `libraryName` | `force` |
@@ -257,7 +257,7 @@ Tous les outils acceptent un paramètre optionnel `environment` pour cibler un e
 | 🆕 `upsert-web-resource` | Créer ou mettre à jour (idempotent par nom) | `name`, `displayName`, `webResourceType`, + (`content` **OU** `filePath`) | `description`, `solutionName` |
 | 🆕 `delete-web-resource` | Supprimer une web resource (irréversible) | `webResourceId` | |
 
-> ⚠️ **`content` vs `filePath` (create / update / upsert web resource)** : fournir **exactement un des deux**. `content` = chaîne base64 inline (legacy, force l'appelant — typiquement un LLM — à re-générer tout le contenu en sortie). `filePath` = chemin absolu sur disque, lu et base64-encodé côté serveur — **à préférer pour tout JS/CSS de plus de quelques Ko**, évite la regénération coûteuse côté modèle. Les deux ensemble = erreur. Aucun des deux = erreur.
+> ⚠️ **`content` vs `filePath` (create / update / upsert web resource)** : fournir **exactement un des deux**. `content` = chaîne base64 inline (legacy, force l'appelant — typiquement un LLM — à re-générer tout le contenu en sortie) — **validé syntaxiquement avant envoi** (caractères non-base64 ou round-trip cassé → erreur immédiate). `filePath` = chemin absolu sur disque, lu et base64-encodé côté serveur — **à préférer pour tout JS/CSS de plus de quelques Ko**, évite la regénération coûteuse côté modèle. Les deux ensemble = erreur. Aucun des deux = erreur.
 
 ### Configuration (env vars + connection refs)
 

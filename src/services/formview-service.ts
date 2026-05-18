@@ -2,8 +2,96 @@ import { PowerPlatformClient } from '../powerplatform-client.js';
 import type { ApiCollectionResponse } from '../models/index.js';
 import { randomUUID } from 'crypto';
 
-/** Standard classid for a generic form control (works for text, money, picklist, lookup, etc.) */
-const STANDARD_CONTROL_CLASSID = '{4273EDBD-AC1D-40d3-9FB2-095C621B552D}';
+/**
+ * Form control classids by attribute type.
+ *
+ * Dataverse renders a `<control>` using the classid declared in the form XML — it does NOT
+ * silently swap to the appropriate control based on the underlying column type. Using the
+ * text-box classid for a Lookup column produces a single-line text input in the form editor
+ * (and a broken control at runtime). The maker portal's "+ Add field" picks the classid
+ * matching the attribute type; we must replicate that mapping here.
+ *
+ * Reference: Microsoft Dataverse formxml schema — well-known control classids.
+ */
+const STANDARD_CONTROL_CLASSID = '{4273EDBD-AC1D-40d3-9FB2-095C621B552D}'; // text/number/money/decimal/integer/email/url/phone/ticker/autonumber/entityname
+const MEMO_CONTROL_CLASSID = '{E0DECE4B-6FC8-4A8F-A065-082708572369}';     // memo (multi-line text)
+const LOOKUP_CONTROL_CLASSID = '{270BD3DB-D9AF-4782-9025-509E298DEC0A}';   // lookup/customer/owner
+const DATETIME_CONTROL_CLASSID = '{5B773807-9FB2-42DB-97C3-7A91EFF8ADFF}'; // datetime/date-only
+const BOOLEAN_CONTROL_CLASSID = '{B0C6723A-8503-4FD7-BB28-C8A06AC933C2}';  // boolean (two options)
+const PICKLIST_CONTROL_CLASSID = '{3EF39988-22BB-4F0B-BBBE-64B5A3748AEE}'; // picklist/state/status
+const MULTISELECT_CONTROL_CLASSID = '{6FE7DC34-AAEE-4E02-9D34-941F0E5C5A30}'; // multi-select picklist
+const PARTYLIST_CONTROL_CLASSID = '{CBFB742C-14E7-4A17-96BB-1A13F7F64AA2}'; // partylist (activity parties)
+
+/**
+ * Map a Dataverse AttributeTypeName (preferred — covers virtual types like MultiSelectPicklist)
+ * or AttributeType (fallback) to the appropriate form control classid.
+ *
+ * Returns null if the type is unknown — callers should fall back to STANDARD_CONTROL_CLASSID
+ * for scalar-looking unknowns, but MUST refuse silent fallback for known-mismatch types like Lookup.
+ */
+function classIdForAttributeType(attributeTypeName: string | undefined, attributeType: string | undefined): string | null {
+  const typeName = (attributeTypeName ?? '').toLowerCase();
+  const type = (attributeType ?? '').toLowerCase();
+
+  // Prefer AttributeTypeName.Value (more specific — distinguishes MultiSelectPicklist from Virtual)
+  switch (typeName) {
+    case 'stringtype':
+    case 'integertype':
+    case 'bigintype':
+    case 'biginttype':
+    case 'decimaltype':
+    case 'doubletype':
+    case 'moneytype':
+    case 'entitynametype':
+      return STANDARD_CONTROL_CLASSID;
+    case 'memotype':
+      return MEMO_CONTROL_CLASSID;
+    case 'lookuptype':
+    case 'customertype':
+    case 'ownertype':
+      return LOOKUP_CONTROL_CLASSID;
+    case 'datetimetype':
+      return DATETIME_CONTROL_CLASSID;
+    case 'booleantype':
+      return BOOLEAN_CONTROL_CLASSID;
+    case 'picklisttype':
+    case 'statetype':
+    case 'statustype':
+      return PICKLIST_CONTROL_CLASSID;
+    case 'multiselectpicklisttype':
+      return MULTISELECT_CONTROL_CLASSID;
+    case 'partylisttype':
+      return PARTYLIST_CONTROL_CLASSID;
+  }
+
+  // Fallback to AttributeType (less specific, but reliable for the core scalar types)
+  switch (type) {
+    case 'string':
+    case 'integer':
+    case 'bigint':
+    case 'decimal':
+    case 'double':
+    case 'money':
+    case 'entityname':
+      return STANDARD_CONTROL_CLASSID;
+    case 'memo':
+      return MEMO_CONTROL_CLASSID;
+    case 'lookup':
+    case 'customer':
+    case 'owner':
+      return LOOKUP_CONTROL_CLASSID;
+    case 'datetime':
+      return DATETIME_CONTROL_CLASSID;
+    case 'boolean':
+      return BOOLEAN_CONTROL_CLASSID;
+    case 'picklist':
+    case 'state':
+    case 'status':
+      return PICKLIST_CONTROL_CLASSID;
+  }
+
+  return null;
+}
 
 export interface FormSummary {
   formid: string;
@@ -35,6 +123,44 @@ export class FormViewService {
    * formxml returns the patched value, so post-PATCH verification cannot detect the silent failure.
    * The only reliable signal is the pre-PATCH iscustomizable.Value flag.
    */
+  /**
+   * Resolve the form control classid to use for an attribute, based on its Dataverse type.
+   *
+   * Throws if the attribute does not exist on the entity. Falls back to the standard
+   * text classid for unknown types (e.g. file/image/virtual non-multi-select) — but ONLY
+   * after explicitly logging the unknown type, never silently for known mismatches.
+   */
+  private async resolveControlClassId(entityLogicalName: string, attributeName: string): Promise<string> {
+    const meta = await this.client.get<{
+      AttributeType?: string;
+      AttributeTypeName?: { Value: string };
+      LogicalName?: string;
+    }>(
+      `api/data/v9.2/EntityDefinitions(LogicalName='${entityLogicalName}')/Attributes(LogicalName='${attributeName}')` +
+        `?$select=AttributeType,AttributeTypeName,LogicalName`,
+    );
+
+    if (!meta || !meta.LogicalName) {
+      throw new Error(
+        `Attribute '${attributeName}' does not exist on entity '${entityLogicalName}'. ` +
+          `Create the column first, then add it to the form.`,
+      );
+    }
+
+    const classId = classIdForAttributeType(meta.AttributeTypeName?.Value, meta.AttributeType);
+    if (classId) return classId;
+
+    // Truly unknown type — log and fall back to STANDARD. Lookup/picklist/boolean/datetime/memo are
+    // all covered by classIdForAttributeType, so reaching here implies an exotic type (file, image,
+    // calendarrules, managedproperty…) which the form editor would not normally accept anyway.
+    console.warn(
+      `[formview] Unknown attribute type for '${entityLogicalName}.${attributeName}' ` +
+        `(AttributeType=${meta.AttributeType}, AttributeTypeName=${meta.AttributeTypeName?.Value}). ` +
+        `Falling back to STANDARD_CONTROL_CLASSID — verify the form in the maker portal.`,
+    );
+    return STANDARD_CONTROL_CLASSID;
+  }
+
   private async assertFormCustomizable(formId: string, operation: string): Promise<void> {
     const form = await this.client.get<{
       name?: string;
@@ -110,9 +236,13 @@ export class FormViewService {
       return { added: false };
     }
 
+    // Resolve the control classid from the attribute's actual Dataverse type
+    // (Lookup/DateTime/Boolean/Picklist/Memo each need their own classid — STANDARD only fits scalars).
+    const classId = await this.resolveControlClassId(entityLogicalName, attributeName);
+
     // Build the new row element.
     const cellId = `{${randomUUID()}}`;
-    const newRow = `<row><cell id="${cellId}" showlabel="true" locklevel="0"><labels><label description="${attributeName}" languagecode="1033" /></labels><control id="${attributeName}" classid="${STANDARD_CONTROL_CLASSID}" datafieldname="${attributeName}" /></cell></row>`;
+    const newRow = `<row><cell id="${cellId}" showlabel="true" locklevel="0"><labels><label description="${attributeName}" languagecode="1033" /></labels><control id="${attributeName}" classid="${classId}" datafieldname="${attributeName}" /></cell></row>`;
 
     // Insert before the closing </rows> of the first section.
     const rowsCloseIdx = xml.indexOf('</rows>');
@@ -173,9 +303,12 @@ export class FormViewService {
       );
     }
 
+    // Resolve the control classid from the attribute's actual Dataverse type.
+    const classId = await this.resolveControlClassId(entityLogicalName, attributeName);
+
     // Build the new row element (same shape as addFormField).
     const cellId = `{${randomUUID()}}`;
-    const newRow = `<row><cell id="${cellId}" showlabel="true" locklevel="0"><labels><label description="${attributeName}" languagecode="1033" /></labels><control id="${attributeName}" classid="${STANDARD_CONTROL_CLASSID}" datafieldname="${attributeName}" /></cell></row>`;
+    const newRow = `<row><cell id="${cellId}" showlabel="true" locklevel="0"><labels><label description="${attributeName}" languagecode="1033" /></labels><control id="${attributeName}" classid="${classId}" datafieldname="${attributeName}" /></cell></row>`;
 
     const replacement = position === 'before' ? `${newRow}${match[0]}` : `${match[0]}${newRow}`;
     xml = xml.replace(match[0], replacement);
