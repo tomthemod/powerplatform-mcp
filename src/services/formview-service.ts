@@ -199,6 +199,127 @@ export class FormViewService {
   }
 
   /**
+   * Read a form's customizability flags WITHOUT pulling the (potentially huge) formxml.
+   *
+   * This is the read-only counterpart of the private `assertFormCustomizable` guard. It exists so
+   * agents can run the Story Refiner "2b-sexies" preflight (decide mcp_ok vs manual_required) with a
+   * ~200-byte response instead of a ~200k-char `query-records(systemforms)` dump that drags the full
+   * formxml into the model context.
+   *
+   * `decision` mirrors the refiner gate:
+   *   - iscustomizable.Value === false                       → 'manual_required'
+   *   - iscustomizable.Value === true && ismanaged === true  → 'mcp_ok' (requires_post_patch_verification)
+   *   - iscustomizable.Value === true && ismanaged === false → 'mcp_ok'
+   */
+  async getFormCustomizability(formId: string): Promise<{
+    formid: string;
+    name: string;
+    type: number | null;
+    ismanaged: boolean;
+    iscustomizable: boolean;
+    decision: 'mcp_ok' | 'manual_required';
+    requires_post_patch_verification: boolean;
+  }> {
+    const form = await this.client.get<{
+      formid?: string;
+      name?: string;
+      type?: number;
+      ismanaged?: boolean;
+      iscustomizable?: { Value: boolean };
+    }>(`api/data/v9.2/systemforms(${formId})?$select=formid,name,type,ismanaged,iscustomizable`);
+
+    const ismanaged = form.ismanaged === true;
+    const iscustomizable = form.iscustomizable?.Value === true;
+    const decision: 'mcp_ok' | 'manual_required' = iscustomizable ? 'mcp_ok' : 'manual_required';
+
+    return {
+      formid: form.formid ?? formId,
+      name: form.name ?? '(unnamed)',
+      type: form.type ?? null,
+      ismanaged,
+      iscustomizable,
+      decision,
+      requires_post_patch_verification: decision === 'mcp_ok' && ismanaged,
+    };
+  }
+
+  /**
+   * Parse the event handlers wired on a form (form-level onload/onsave AND field-level onchange)
+   * server-side, returning a compact JSON structure instead of the raw formxml.
+   *
+   * Used by the Story Refiner 2b-tris / 2b-quater gates to discover whether a field already carries
+   * an onchange handler (so the story can extend the JS without re-registering a form handler).
+   *
+   * Returns the registered libraries and, per event, the attached handlers with their parameters.
+   */
+  async getFormEventHandlers(formId: string): Promise<{
+    libraries: string[];
+    events: Array<{
+      event: string;
+      attribute: string | null;
+      handlers: Array<{
+        functionName: string;
+        libraryName: string;
+        enabled: boolean;
+        passExecutionContext: boolean;
+        parameters: string;
+      }>;
+    }>;
+  }> {
+    const form = await this.client.get<{ formxml: string }>(
+      `api/data/v9.2/systemforms(${formId})?$select=formxml`,
+    );
+    const xml = form.formxml ?? '';
+
+    // Registered libraries.
+    const libraries: string[] = [];
+    const libRe = /<Library[^>]*\sname="([^"]+)"/gi;
+    let libMatch: RegExpExecArray | null;
+    while ((libMatch = libRe.exec(xml)) !== null) {
+      if (!libraries.includes(libMatch[1])) libraries.push(libMatch[1]);
+    }
+
+    const decode = (s: string) =>
+      s.replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+
+    const events: Array<{ event: string; attribute: string | null; handlers: any[] }> = [];
+    const eventRe = /<event\s+([^>]*?)>([\s\S]*?)<\/event>/gi;
+    let evMatch: RegExpExecArray | null;
+    while ((evMatch = eventRe.exec(xml)) !== null) {
+      const attrs = evMatch[1];
+      const body = evMatch[2];
+      const nameM = attrs.match(/\bname="([^"]*)"/i);
+      const attrM = attrs.match(/\battribute="([^"]*)"/i);
+      const eventName = nameM ? nameM[1] : '';
+
+      const handlers: any[] = [];
+      const hRe = /<Handler\b([^>]*)\/>/gi;
+      let hMatch: RegExpExecArray | null;
+      while ((hMatch = hRe.exec(body)) !== null) {
+        const h = hMatch[1];
+        const fn = h.match(/functionName="([^"]*)"/i);
+        const lib = h.match(/libraryName="([^"]*)"/i);
+        const en = h.match(/enabled="([^"]*)"/i);
+        const pec = h.match(/passExecutionContext="([^"]*)"/i);
+        const params = h.match(/parameters="([^"]*)"/i);
+        handlers.push({
+          functionName: fn ? fn[1] : '',
+          libraryName: lib ? lib[1] : '',
+          enabled: en ? en[1] === 'true' : true,
+          passExecutionContext: pec ? pec[1] === 'true' : false,
+          parameters: params ? decode(params[1]) : '',
+        });
+      }
+
+      if (handlers.length > 0) {
+        events.push({ event: eventName, attribute: attrM ? attrM[1] : null, handlers });
+      }
+    }
+
+    return { libraries, events };
+  }
+
+  /**
    * Get the fields currently on a form by parsing its formxml.
    * Returns the list of `datafieldname` values found in `<control>` elements.
    */

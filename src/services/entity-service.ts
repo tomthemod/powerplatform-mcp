@@ -88,6 +88,70 @@ export class EntityService {
   }
 
   /**
+   * Get the options (value + localized label) of a choice attribute — Picklist, MultiSelect Picklist,
+   * State, Status or Boolean (Two Option). Replaces the `stringmaps` workaround: `get-entity-attribute`
+   * returns the picklist metadata WITHOUT the OptionSet (options live on the derived attribute type and
+   * need an explicit `$expand`), so callers previously had to fall back to querying the stringmaps table.
+   *
+   * @param entityName The logical name of the entity
+   * @param attributeName The logical name of the choice attribute
+   * @param languageCode Locale for the returned labels (default 1036 — French). Falls back to the
+   *   attribute's UserLocalizedLabel when the requested locale is absent.
+   * @returns { attributeType, isGlobal, optionSetName, options: [{ value, label }] }
+   */
+  async getAttributeOptions(
+    entityName: string,
+    attributeName: string,
+    languageCode: number = 1036,
+  ): Promise<{ attributeType: string; isGlobal: boolean; optionSetName: string | null; options: { value: number; label: string }[] }> {
+    // 1. Determine the attribute's concrete type so we can issue the right metadata cast.
+    const meta = await this.client.get<{ AttributeType?: string; AttributeTypeName?: { Value: string }; LogicalName?: string }>(
+      `api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')/Attributes(LogicalName='${attributeName}')?$select=AttributeType,AttributeTypeName,LogicalName`,
+    );
+    if (!meta || !meta.LogicalName) {
+      throw new Error(`Attribute '${attributeName}' does not exist on entity '${entityName}'.`);
+    }
+
+    const type = (meta.AttributeType ?? '').toLowerCase();
+    const castByType: Record<string, string> = {
+      picklist: 'PicklistAttributeMetadata',
+      state: 'StateAttributeMetadata',
+      status: 'StatusAttributeMetadata',
+      virtual: 'MultiSelectPicklistAttributeMetadata', // MultiSelect surfaces as Virtual in AttributeType
+      multiselectpicklist: 'MultiSelectPicklistAttributeMetadata',
+      boolean: 'BooleanAttributeMetadata',
+    };
+    const cast = castByType[type];
+    if (!cast) {
+      throw new Error(`Attribute '${attributeName}' is type '${meta.AttributeType}', not a choice/boolean attribute — no options to return.`);
+    }
+
+    const base = `api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')/Attributes(LogicalName='${attributeName}')/Microsoft.Dynamics.CRM.${cast}`;
+
+    const pickLabel = (lbl: any): string => {
+      if (!lbl) return '';
+      const localized = (lbl.LocalizedLabels ?? []).find((l: any) => l.LanguageCode === languageCode);
+      return localized?.Label ?? lbl.UserLocalizedLabel?.Label ?? (lbl.LocalizedLabels?.[0]?.Label ?? '');
+    };
+
+    if (cast === 'BooleanAttributeMetadata') {
+      const resp = await this.client.get<any>(`${base}?$expand=OptionSet`);
+      const os = resp?.OptionSet;
+      const options: { value: number; label: string }[] = [];
+      if (os?.FalseOption) options.push({ value: os.FalseOption.Value, label: pickLabel(os.FalseOption.Label) });
+      if (os?.TrueOption) options.push({ value: os.TrueOption.Value, label: pickLabel(os.TrueOption.Label) });
+      return { attributeType: meta.AttributeType ?? 'Boolean', isGlobal: false, optionSetName: os?.Name ?? null, options };
+    }
+
+    // Picklist / MultiSelect / State / Status — local OptionSet or linked GlobalOptionSet.
+    const resp = await this.client.get<any>(`${base}?$expand=OptionSet,GlobalOptionSet`);
+    const os = resp?.GlobalOptionSet ?? resp?.OptionSet;
+    const isGlobal = !!resp?.GlobalOptionSet || os?.IsGlobal === true;
+    const options = (os?.Options ?? []).map((o: any) => ({ value: o.Value, label: pickLabel(o.Label) }));
+    return { attributeType: meta.AttributeType ?? 'Picklist', isGlobal, optionSetName: os?.Name ?? null, options };
+  }
+
+  /**
    * Get one-to-many relationships for an entity
    * @param entityName The logical name of the entity
    */

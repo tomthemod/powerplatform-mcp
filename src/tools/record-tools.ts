@@ -58,10 +58,11 @@ export function registerRecordTools(server: McpServer, registry: EnvironmentRegi
     "query-records",
     {
       title: "Query Records",
-      description: "Query records using an OData filter expression",
+      description: "Query records using an OData filter expression. Pass `select` to project only the columns you need — without it Dataverse returns every column, which can be huge for entities with large text fields (e.g. systemforms.formxml).",
       inputSchema: {
         entityNamePlural: z.string().describe("The plural name of the entity (e.g., 'accounts', 'contacts')"),
         filter: z.string().describe("OData filter expression (e.g., \"name eq 'test'\" or \"createdon gt 2023-01-01\")"),
+        select: z.string().optional().describe("Comma-separated column projection ($select), e.g. 'formid,name,ismanaged,iscustomizable'. Strongly recommended to avoid pulling large columns."),
         maxRecords: z.number().optional().describe("Maximum number of records to retrieve (default: 50)"),
         environment: z.string().optional().describe("Environment name (e.g. DEV, UAT). Uses default if omitted."),
       },
@@ -72,11 +73,11 @@ export function registerRecordTools(server: McpServer, registry: EnvironmentRegi
         records: z.any(),
       }),
     },
-    async ({ entityNamePlural, filter, maxRecords, environment }) => {
+    async ({ entityNamePlural, filter, select, maxRecords, environment }) => {
       try {
         const ctx = registry.getContext(environment);
         const service = ctx.getRecordService();
-        const records = await service.queryRecords(entityNamePlural, filter, maxRecords || 50);
+        const records = await service.queryRecords(entityNamePlural, filter, maxRecords || 50, select);
         const recordCount = records.value?.length || 0;
 
         return {

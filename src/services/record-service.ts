@@ -23,12 +23,19 @@ export class RecordService {
    * @param entityNamePlural The plural name of the entity (e.g., 'accounts', 'contacts')
    * @param filter OData filter expression (e.g., "name eq 'test'")
    * @param maxRecords Maximum number of records to retrieve (default: 50)
+   * @param select Optional comma-separated column projection ($select). When omitted, Dataverse
+   *   returns ALL columns — which can be huge for entities carrying large text fields (e.g.
+   *   systemforms.formxml ~200k chars). Always pass `select` when you only need a few columns.
    * @returns Filtered list of records
    */
-  async queryRecords(entityNamePlural: string, filter: string, maxRecords: number = 50): Promise<ApiCollectionResponse<any>> {
-    return this.client.get<ApiCollectionResponse<any>>(
-      `api/data/v9.2/${entityNamePlural}?$filter=${encodeURIComponent(filter)}&$top=${maxRecords}`
-    );
+  async queryRecords(entityNamePlural: string, filter: string, maxRecords: number = 50, select?: string): Promise<ApiCollectionResponse<any>> {
+    let url = `api/data/v9.2/${entityNamePlural}?$filter=${encodeURIComponent(filter)}&$top=${maxRecords}`;
+    if (select && select.trim().length > 0) {
+      // Normalise whitespace then re-join so callers can pass "formid, name , ismanaged".
+      const columns = select.split(',').map(c => c.trim()).filter(Boolean).join(',');
+      url += `&$select=${encodeURIComponent(columns)}`;
+    }
+    return this.client.get<ApiCollectionResponse<any>>(url);
   }
 
   /**

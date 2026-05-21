@@ -44,6 +44,80 @@ export function registerFormViewTools(server: McpServer, registry: EnvironmentRe
     }
   );
 
+  // Get Form Customizability
+  server.registerTool(
+    "get-form-customizability",
+    {
+      title: "Get Form Customizability",
+      description: "Read a form's ismanaged/iscustomizable flags (and a refiner-style decision) WITHOUT pulling the formxml. Use this for the 2b-sexies preflight instead of query-records(systemforms) which returns the full ~200k-char formxml.",
+      inputSchema: {
+        formId: z.string().describe("The systemform GUID"),
+        environment: z.string().optional(),
+      },
+      outputSchema: z.object({
+        formid: z.string(),
+        name: z.string(),
+        type: z.number().nullable(),
+        ismanaged: z.boolean(),
+        iscustomizable: z.boolean(),
+        decision: z.string(),
+        requires_post_patch_verification: z.boolean(),
+      }),
+    },
+    async ({ formId, environment }) => {
+      try {
+        const ctx = registry.getContext(environment);
+        const service = ctx.getFormViewService();
+        const info = await service.getFormCustomizability(formId);
+        return {
+          structuredContent: info,
+          content: [{ type: "text", text: `Form '${info.name}' (${info.formid}): ismanaged=${info.ismanaged}, iscustomizable=${info.iscustomizable} → decision=${info.decision}${info.requires_post_patch_verification ? ' (requires post-patch verification)' : ''}` }],
+        };
+      } catch (error: any) {
+        console.error("Error getting form customizability:", error);
+        return {
+          structuredContent: { formid: formId, name: "", type: null, ismanaged: false, iscustomizable: false, decision: "manual_required", requires_post_patch_verification: false },
+          content: [{ type: "text", text: `Failed to get form customizability: ${error.message}` }],
+        };
+      }
+    }
+  );
+
+  // Get Form Event Handlers
+  server.registerTool(
+    "get-form-event-handlers",
+    {
+      title: "Get Form Event Handlers",
+      description: "List the JS event handlers (form-level onload/onsave + field-level onchange) and registered libraries on a form, parsed server-side from formxml. Compact JSON — does NOT return the raw formxml. Use it to discover whether a field already has an onchange handler before re-registering one.",
+      inputSchema: {
+        formId: z.string().describe("The systemform GUID"),
+        environment: z.string().optional(),
+      },
+      outputSchema: z.object({
+        formId: z.string(),
+        libraries: z.array(z.string()),
+        events: z.any(),
+      }),
+    },
+    async ({ formId, environment }) => {
+      try {
+        const ctx = registry.getContext(environment);
+        const service = ctx.getFormViewService();
+        const parsed = await service.getFormEventHandlers(formId);
+        return {
+          structuredContent: { formId, libraries: parsed.libraries, events: parsed.events },
+          content: [{ type: "text", text: `Form ${formId}: ${parsed.libraries.length} libraries, ${parsed.events.length} event(s) with handlers:\n\n${JSON.stringify(parsed, null, 2)}` }],
+        };
+      } catch (error: any) {
+        console.error("Error getting form event handlers:", error);
+        return {
+          structuredContent: { formId, libraries: [], events: [] },
+          content: [{ type: "text", text: `Failed to get form event handlers: ${error.message}` }],
+        };
+      }
+    }
+  );
+
   // Get Form Fields
   server.registerTool(
     "get-form-fields",

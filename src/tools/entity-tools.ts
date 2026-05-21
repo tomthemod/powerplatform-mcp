@@ -96,6 +96,51 @@ export function registerEntityTools(server: McpServer, registry: EnvironmentRegi
     }
   );
 
+  // Get Attribute Options
+  server.registerTool(
+    "get-attribute-options",
+    {
+      title: "Get Attribute Options",
+      description: "Get the options (value + localized label) of a choice attribute (Picklist / MultiSelect / State / Status / Boolean). Returns FR (1036) labels by default. Use this instead of get-entity-attribute (which omits the OptionSet) or the stringmaps workaround.",
+      inputSchema: {
+        entityName: z.string().describe("The logical name of the entity"),
+        attributeName: z.string().describe("The logical name of the choice attribute"),
+        languageCode: z.number().optional().describe("Locale for labels (default 1036 — French)"),
+        environment: z.string().optional().describe("Environment name (e.g. DEV, UAT). Uses default if omitted."),
+      },
+      outputSchema: z.object({
+        entityName: z.string(),
+        attributeName: z.string(),
+        attributeType: z.string(),
+        isGlobal: z.boolean(),
+        optionSetName: z.string().nullable(),
+        options: z.any(),
+      }),
+    },
+    async ({ entityName, attributeName, languageCode, environment }) => {
+      try {
+        const ctx = registry.getContext(environment);
+        const service = ctx.getEntityService();
+        const result = await service.getAttributeOptions(entityName, attributeName, languageCode ?? 1036);
+        return {
+          structuredContent: { entityName, attributeName, ...result },
+          content: [
+            {
+              type: "text",
+              text: `Options for '${entityName}.${attributeName}' (${result.attributeType}${result.isGlobal ? `, global: ${result.optionSetName}` : ', local'}):\n\n${result.options.map((o: any) => `  ${o.value} = ${o.label}`).join('\n')}`,
+            },
+          ],
+        };
+      } catch (error: any) {
+        console.error("Error getting attribute options:", error);
+        return {
+          structuredContent: { entityName, attributeName, attributeType: "", isGlobal: false, optionSetName: null, options: [] },
+          content: [{ type: "text", text: `Failed to get attribute options: ${error.message}` }],
+        };
+      }
+    }
+  );
+
   // Get Entity Attribute
   server.registerTool(
     "get-entity-attribute",
