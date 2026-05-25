@@ -616,12 +616,32 @@ export class FormViewService {
     );
     let xml = form.formxml ?? '';
 
-    // No-op if the same handler is already on the same event.
-    const existsRegex = new RegExp(
+    // No-op if the same handler is already on the SAME event (and same attribute for onchange).
+    // The check must be scoped to the relevant <event> block — otherwise the same function/library
+    // bound to another event on the same form (e.g. onChange on a different field) causes a false
+    // positive and silently refuses the registration.
+    const handlerExistsRegex = new RegExp(
       `<Handler[^>]*functionName="${functionName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"[^>]*libraryName="${libraryName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"`,
       'i',
     );
-    if (existsRegex.test(xml)) {
+    let eventScopeXml: string | null = null;
+    if (eventName === 'onchange') {
+      const escapedAttrForScope = attributeName!.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const scopeRegex = new RegExp(
+        `<event[^>]*name="onchange"[^>]*attribute="${escapedAttrForScope}"[^>]*>[\\s\\S]*?<\\/event>`,
+        'i',
+      );
+      const m = xml.match(scopeRegex);
+      eventScopeXml = m ? m[0] : null;
+    } else {
+      const scopeRegex = new RegExp(
+        `<event\\s+name="${eventName}"[^>]*>[\\s\\S]*?<\\/event>`,
+        'i',
+      );
+      const m = xml.match(scopeRegex);
+      eventScopeXml = m ? m[0] : null;
+    }
+    if (eventScopeXml && handlerExistsRegex.test(eventScopeXml)) {
       return { added: false };
     }
 
