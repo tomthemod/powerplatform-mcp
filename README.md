@@ -123,6 +123,7 @@ Tous les outils acceptent un paramètre optionnel `environment` pour cibler un e
 | `get-entity-metadata` | Métadonnée d'une entité | `entityName` | |
 | `get-entity-attributes` | Liste des attributs/champs | `entityName` | |
 | `get-entity-attribute` | Détails d'un attribut spécifique | `entityName`, `attributeName` | |
+| 🆕 `get-attribute-options` | Lister les options d'un picklist (local ou global) avec leurs valeurs et labels | `entityName`, `attributeName` | |
 | `get-entity-relationships` | Relations 1:N et N:N | `entityName` | |
 | `get-entity-keys` | Clés alternatives sur l'entité | `entityName` | |
 | 🆕 `create-entity` | Créer une nouvelle table custom | `schemaName`, `displayName`, `displayCollectionName`, `primaryNameSchemaName`, `primaryNameDisplayName` | `description`, `ownershipType`, `hasActivities`, `hasNotes`, `languageCode`, `solutionName` |
@@ -139,6 +140,7 @@ Tous les outils acceptent un paramètre optionnel `environment` pour cibler un e
 | 🆕 `create-entity-many-to-many-relationship` | Relation N:N (Dataverse génère l'intersect entity) | `entity1LogicalName`, `entity2LogicalName`, `relationshipSchemaName` | `intersectEntitySchemaName`, `entity1NavLabel`, `entity2NavLabel`, `languageCode`, `solutionName` |
 | `create-entity-alternate-key` | Clé alternative | `entityName`, `schemaName`, `displayName`, `keyAttributes` | `solutionName` |
 | 🆕 `delete-entity-attribute` | Supprimer un attribut (irréversible) | `entityName`, `attributeName` | |
+| 🆕 `update-attribute-label` | Mettre à jour le label d'affichage d'un attribut (toutes langues si supportées) | `entityName`, `attributeName`, `displayName` | `languageCode` |
 
 ### Option Sets
 
@@ -146,13 +148,16 @@ Tous les outils acceptent un paramètre optionnel `environment` pour cibler un e
 |---|---|---|---|
 | `get-global-option-set` | Détails d'un global option set | `optionSetName` | |
 | 🆕 `create-global-option-set` | Créer un global option set réutilisable | `name`, `displayName`, `options` | `description`, `languageCode`, `solutionName` |
+| 🆕 `add-picklist-option` | Ajouter une option à un picklist local (entité+attribut) OU global (optionSetName) — fournir exactement un des deux. Valeur auto-assignée si omise. | `label` + (`entityName`+`attributeName` **OU** `optionSetName`) | `value`, `languageCode`, `solutionName` |
+| 🆕 `remove-picklist-option` | Retirer une option d'un picklist (local ou global) par sa valeur | `value` + (`entityName`+`attributeName` **OU** `optionSetName`) | `solutionName` |
+| 🆕 `update-picklist-option-label` | Mettre à jour le label d'une option existante (local ou global) | `value`, `label` + (`entityName`+`attributeName` **OU** `optionSetName`) | `languageCode`, `solutionName` |
 
 ### Enregistrements (CRUD)
 
 | Outil | Description | Paramètres requis | Optionnels |
 |---|---|---|---|
 | `get-record` | Lire un enregistrement par ID | `entityNamePlural`, `recordId` | |
-| `query-records` | Requête OData | `entityNamePlural`, `filter` | `maxRecords` (défaut 50) |
+| `query-records` | Requête OData | `entityNamePlural`, `filter` | `select` (projection `$select` — **fortement recommandé** pour éviter de tirer toutes les colonnes, notamment les gros champs texte comme `systemforms.formxml`), `maxRecords` (défaut 50) |
 | 🆕 `create-record` | Créer un enregistrement (lookups via `@odata.bind`) | `entityNamePlural`, `data` | |
 | 🆕 `update-record` | PATCH partiel | `entityNamePlural`, `recordId`, `data` | |
 | 🆕 `delete-record` | Supprimer un enregistrement | `entityNamePlural`, `recordId` | |
@@ -165,6 +170,8 @@ Tous les outils acceptent un paramètre optionnel `environment` pour cibler un e
 |---|---|---|---|
 | 🆕 `get-entity-forms` | Lister les formulaires d'une entité | `entityLogicalName` | `type` (2=Main, 5=QuickView, 6=QuickCreate, 7=Dashboard) |
 | 🆕 `get-form-fields` | Champs présents sur un formulaire | `formId` | |
+| 🆕 `get-form-customizability` | Vérifier si un formulaire est personnalisable (`iscustomizable.Value`, `ismanaged`). Utile pour pré-flighter une modif avant un PATCH `formxml` qui serait silencieusement ignoré sur un form managé. | `formId` | |
+| 🆕 `get-form-event-handlers` | Lister les handlers JS attachés à un formulaire (form-level + per-field), avec leur library et `functionName` | `formId` | |
 | 🆕 `add-form-field` | Ajouter un champ en bas de la 1re section (classid auto-résolu selon le type Dataverse : Lookup, DateTime, Boolean, Picklist, Memo, etc.) | `entityLogicalName`, `formId`, `attributeName` | |
 | 🆕 `add-form-field-relative` | Ajouter un champ avant/après un champ existant (classid auto-résolu selon le type) | `entityLogicalName`, `formId`, `attributeName`, `relativeToField`, `position` (`before`/`after`) | |
 | 🆕 `remove-form-field` | Retirer un champ d'un formulaire | `entityLogicalName`, `formId`, `attributeName` | |
