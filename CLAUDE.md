@@ -63,7 +63,7 @@ Audit effectué : `git log --all -p -S` sur les patterns `&lt;client_subdomain&g
 
 ## R-4 : Build avant commit
 
-`npm run build` (= `tsc`) doit passer sans erreur avant tout commit. Le script [`C:\Work\Sources\powerplatform-mcp-commit-push.bat`](../powerplatform-mcp-commit-push.bat) le fait déjà — l'utiliser systématiquement plutôt que `git commit` direct.
+`npm run build` (= `tsc`) doit passer sans erreur avant tout commit. Le script [`C:\Work\Sources\00 - Perso\powerplatform-mcp-commit-push.bat`](../powerplatform-mcp-commit-push.bat) le fait déjà — l'utiliser systématiquement plutôt que `git commit` direct.
 
 ---
 
