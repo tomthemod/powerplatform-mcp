@@ -414,11 +414,18 @@ export class FormViewService {
       return { added: false };
     }
 
-    // Locate the <row>...</row> block containing the reference field.
-    const escaped = relativeToField.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const rowRegex = new RegExp(`<row(?:\\s[^>]*)?>([\\s\\S]*?datafieldname="${escaped}"[\\s\\S]*?)<\\/row>`, 'i');
-    const match = xml.match(rowRegex);
-    if (!match) {
+    // Iterate row-by-row to find the row containing the reference field. A single
+    // `<row>…datafieldname="X"…</row>` regex would bridge across `</row>` boundaries when the
+    // target row isn't the first one, returning a multi-row blob and mispositioning the insert.
+    const lowerNeedle = `datafieldname="${relativeToField.toLowerCase()}"`;
+    let matchedRow: string | null = null;
+    for (const m of xml.matchAll(/<row\b[^>]*>[\s\S]*?<\/row>/gi)) {
+      if (m[0].toLowerCase().includes(lowerNeedle)) {
+        matchedRow = m[0];
+        break;
+      }
+    }
+    if (!matchedRow) {
       throw new Error(
         `Reference field '${relativeToField}' was not found on form ${formId} — cannot position '${attributeName}' relative to it.`,
       );
@@ -431,8 +438,10 @@ export class FormViewService {
     const cellId = `{${randomUUID()}}`;
     const newRow = `<row><cell id="${cellId}" showlabel="true" locklevel="0"><labels><label description="${attributeName}" languagecode="1033" /></labels><control id="${attributeName}" classid="${classId}" datafieldname="${attributeName}" /></cell></row>`;
 
-    const replacement = position === 'before' ? `${newRow}${match[0]}` : `${match[0]}${newRow}`;
-    xml = xml.replace(match[0], replacement);
+    // Splice positionally to avoid an accidental second-match if two rows happen to be byte-identical.
+    const idx = xml.indexOf(matchedRow);
+    const replacement = position === 'before' ? `${newRow}${matchedRow}` : `${matchedRow}${newRow}`;
+    xml = xml.slice(0, idx) + replacement + xml.slice(idx + matchedRow.length);
 
     await this.client.patch(`api/data/v9.2/systemforms(${formId})`, { formxml: xml });
     await this.publishEntity(entityLogicalName);
@@ -455,13 +464,20 @@ export class FormViewService {
     );
     let xml = form.formxml ?? '';
 
-    // Build a regex that matches the <row> containing the target control.
-    // Use a non-greedy match between <row> and </row> to avoid over-matching.
-    const escaped = attributeName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const rowRegex = new RegExp(`<row>[\\s\\S]*?datafieldname="${escaped}"[\\s\\S]*?<\\/row>`, 'i');
-    const newXml = xml.replace(rowRegex, '');
+    // Iterate row-by-row so the replacement is scoped to the single <row> containing the field.
+    // A single `<row>…datafieldname="X"…</row>` regex would bridge across `</row>` boundaries when
+    // the target row isn't the first one, wiping out every preceding row in the section.
+    const lowerNeedle = `datafieldname="${attributeName.toLowerCase()}"`;
+    let removed = false;
+    const newXml = xml.replace(/<row\b[^>]*>[\s\S]*?<\/row>/gi, (rowBlock) => {
+      if (!removed && rowBlock.toLowerCase().includes(lowerNeedle)) {
+        removed = true;
+        return '';
+      }
+      return rowBlock;
+    });
 
-    if (newXml === xml) {
+    if (!removed) {
       return { removed: false };
     }
 
