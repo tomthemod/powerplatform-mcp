@@ -11,7 +11,8 @@
     "prepublishOnly": "npm run build",
     "start": "node build/index.js",
     "dev": "npm run build && npm run start",
-    "inspector": "npm run build && dotenv -- npx @modelcontextprotocol/inspector node build/index.js"
+    "inspector": "npm run build && dotenv -- npx @modelcontextprotocol/inspector node build/index.js",
+    "test": "vitest run"
   },
   "files": [
     "build",
