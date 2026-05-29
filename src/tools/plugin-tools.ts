@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { EnvironmentRegistry } from "../environment-config.js";
+import { resolveBinaryContent } from "../services/file-content.js";
 
 /**
  * Register plugin tools with the MCP server.
@@ -469,22 +470,24 @@ export function registerPluginTools(server: McpServer, registry: EnvironmentRegi
     "register-plugin-package",
     {
       title: "Register Plugin Package",
-      description: "Register a new plugin package by uploading a base64-encoded .nupkg file.",
+      description: "Register a new plugin package by uploading a .nupkg file. Provide either `content` (base64) or `filePath` (absolute path read & base64-encoded server-side — preferred for large packages, avoids forcing the model to emit a multi-MB payload).",
       inputSchema: {
         name: z.string(),
         uniqueName: z.string(),
         version: z.string().describe("Package version, e.g. '1.0.0'"),
-        content: z.string().describe("Base64-encoded .nupkg file content"),
+        content: z.string().optional().describe("Base64-encoded .nupkg file content. Mutually exclusive with `filePath`."),
+        filePath: z.string().optional().describe("Absolute path to the .nupkg file on disk. Read & base64-encoded server-side. Prefer this for non-trivial packages — avoids forcing the caller to emit the full base64 payload. Mutually exclusive with `content`."),
         solutionName: z.string().optional(),
         environment: z.string().optional(),
       },
       outputSchema: z.object({ pluginPackageId: z.string() }),
     },
-    async ({ name, uniqueName, version, content, solutionName, environment }) => {
+    async ({ name, uniqueName, version, content, filePath, solutionName, environment }) => {
       try {
         const ctx = registry.getContext(environment);
         const service = ctx.getPluginService();
-        const result = await service.registerPluginPackage({ name, uniqueName, version, content, solutionName });
+        const resolvedContent = await resolveBinaryContent({ content, filePath });
+        const result = await service.registerPluginPackage({ name, uniqueName, version, content: resolvedContent, solutionName });
         return {
           structuredContent: { pluginPackageId: result.pluginPackageId },
           content: [{ type: "text", text: `Registered plugin package '${name}' v${version} (ID: ${result.pluginPackageId})` }],
@@ -504,19 +507,21 @@ export function registerPluginTools(server: McpServer, registry: EnvironmentRegi
     "update-plugin-package",
     {
       title: "Update Plugin Package",
-      description: "Update an existing plugin package's content (and optionally version).",
+      description: "Update an existing plugin package's content (and optionally version). Provide either `content` (base64) or `filePath` (absolute path read & base64-encoded server-side — preferred for large packages).",
       inputSchema: {
         pluginPackageId: z.string(),
-        content: z.string().describe("Base64-encoded .nupkg file content"),
+        content: z.string().optional().describe("Base64-encoded .nupkg file content. Mutually exclusive with `filePath`."),
+        filePath: z.string().optional().describe("Absolute path to the .nupkg file on disk. Read & base64-encoded server-side. Mutually exclusive with `content`."),
         version: z.string().optional(),
         environment: z.string().optional(),
       },
     },
-    async ({ pluginPackageId, content, version, environment }) => {
+    async ({ pluginPackageId, content, filePath, version, environment }) => {
       try {
         const ctx = registry.getContext(environment);
         const service = ctx.getPluginService();
-        await service.updatePluginPackage({ pluginPackageId, content, version });
+        const resolvedContent = await resolveBinaryContent({ content, filePath });
+        await service.updatePluginPackage({ pluginPackageId, content: resolvedContent, version });
         return { content: [{ type: "text", text: `Updated plugin package ${pluginPackageId}${version ? ` to v${version}` : ''}` }] };
       } catch (error: any) {
         console.error("Error updating plugin package:", error);
@@ -602,10 +607,11 @@ export function registerPluginTools(server: McpServer, registry: EnvironmentRegi
     "register-plugin-assembly",
     {
       title: "Register Plugin Assembly",
-      description: "Register a traditional plugin assembly (.dll, base64-encoded). For .nupkg-based packages, use register-plugin-package instead.",
+      description: "Register or update a traditional plugin assembly (.dll). Upsert by name — re-uploads on subsequent calls. Provide either `content` (base64) or `filePath` (absolute path read & base64-encoded server-side — strongly preferred for real assemblies: a 700 KB DLL → ~1 MB base64 cannot be emitted as a single tool-call argument by an LLM, so `filePath` is the only viable path from an agent). For .nupkg-based packages, use register-plugin-package instead.",
       inputSchema: {
         name: z.string().describe("Assembly name (display + identifier)"),
-        content: z.string().describe("Base64-encoded .dll bytes"),
+        content: z.string().optional().describe("Base64-encoded .dll bytes. Mutually exclusive with `filePath`."),
+        filePath: z.string().optional().describe("Absolute path to the .dll file on disk. Read & base64-encoded server-side. Strongly preferred over `content` for real-world assemblies (typical DLL → ~1 MB base64, exceeds LLM output budgets). Mutually exclusive with `content`."),
         version: z.string().describe("Assembly version, e.g. '1.0.0.0'"),
         isolationMode: z.enum(["1", "2"]).optional().describe("1=None, 2=Sandbox (default 2 — Online forces sandbox anyway)"),
         description: z.string().optional(),
@@ -614,12 +620,13 @@ export function registerPluginTools(server: McpServer, registry: EnvironmentRegi
       },
       outputSchema: z.object({ pluginAssemblyId: z.string() }),
     },
-    async ({ name, content, version, isolationMode, description, solutionName, environment }) => {
+    async ({ name, content, filePath, version, isolationMode, description, solutionName, environment }) => {
       try {
         const ctx = registry.getContext(environment);
         const service = ctx.getPluginService();
+        const resolvedContent = await resolveBinaryContent({ content, filePath });
         const iso = isolationMode ? (parseInt(isolationMode, 10) as 1 | 2) : 2;
-        const result = await service.registerPluginAssembly({ name, content, version, isolationMode: iso, description, solutionName });
+        const result = await service.registerPluginAssembly({ name, content: resolvedContent, version, isolationMode: iso, description, solutionName });
         return {
           structuredContent: { pluginAssemblyId: result.pluginAssemblyId },
           content: [{ type: "text", text: `Registered plugin assembly '${name}' v${version} (ID: ${result.pluginAssemblyId})` }],

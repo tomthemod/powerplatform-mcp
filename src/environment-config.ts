@@ -17,6 +17,7 @@ import {
   ServiceEndpointService,
   CustomApiService,
   WebResourceService,
+  PortalService,
 } from './services/index.js';
 import type { ServiceContext } from './types.js';
 
@@ -150,6 +151,7 @@ export class EnvironmentRegistry {
     let serviceEndpointService: ServiceEndpointService | null = null;
     let customApiService: CustomApiService | null = null;
     let webResourceService: WebResourceService | null = null;
+    let portalService: PortalService | null = null;
 
     const ctx: ServiceContext = {
       environmentName: name,
@@ -172,6 +174,7 @@ export class EnvironmentRegistry {
       getServiceEndpointService: () => (serviceEndpointService ??= new ServiceEndpointService(getClient())),
       getCustomApiService: () => (customApiService ??= new CustomApiService(getClient())),
       getWebResourceService: () => (webResourceService ??= new WebResourceService(getClient())),
+      getPortalService: () => (portalService ??= new PortalService(getClient())),
     };
 
     this.contexts.set(name, ctx);

@@ -4,7 +4,7 @@
 >
 > Serveur **Model Context Protocol (MCP)** + **CLI** pour interroger **et configurer** des environnements PowerPlatform / Dataverse depuis un client IA (Claude, Cursor, GitHub Copilot) ou en ligne de commande.
 >
-> Supporte : environnements multiples, métadonnée d'entités, enregistrements, plugins, flows, solutions, workflows, business rules, security roles, custom APIs, web resources, formulaires, vues, et plus — opérations en lecture **et en écriture**.
+> Supporte : environnements multiples, métadonnée d'entités, enregistrements, plugins, flows, solutions, workflows, business rules, security roles, custom APIs, web resources, formulaires, vues, **Power Pages (modèle moderne `mspp_*` / `powerpagecomponent`)**, et plus — opérations en lecture **et en écriture**.
 
 ---
 
@@ -123,6 +123,7 @@ Tous les outils acceptent un paramètre optionnel `environment` pour cibler un e
 | `get-entity-metadata` | Métadonnée d'une entité | `entityName` | |
 | `get-entity-attributes` | Liste des attributs/champs | `entityName` | |
 | `get-entity-attribute` | Détails d'un attribut spécifique | `entityName`, `attributeName` | |
+| 🆕 `get-attribute-options` | Lister les options d'un picklist (local ou global) avec leurs valeurs et labels | `entityName`, `attributeName` | |
 | `get-entity-relationships` | Relations 1:N et N:N | `entityName` | |
 | `get-entity-keys` | Clés alternatives sur l'entité | `entityName` | |
 | 🆕 `create-entity` | Créer une nouvelle table custom | `schemaName`, `displayName`, `displayCollectionName`, `primaryNameSchemaName`, `primaryNameDisplayName` | `description`, `ownershipType`, `hasActivities`, `hasNotes`, `languageCode`, `solutionName` |
@@ -139,6 +140,7 @@ Tous les outils acceptent un paramètre optionnel `environment` pour cibler un e
 | 🆕 `create-entity-many-to-many-relationship` | Relation N:N (Dataverse génère l'intersect entity) | `entity1LogicalName`, `entity2LogicalName`, `relationshipSchemaName` | `intersectEntitySchemaName`, `entity1NavLabel`, `entity2NavLabel`, `languageCode`, `solutionName` |
 | `create-entity-alternate-key` | Clé alternative | `entityName`, `schemaName`, `displayName`, `keyAttributes` | `solutionName` |
 | 🆕 `delete-entity-attribute` | Supprimer un attribut (irréversible) | `entityName`, `attributeName` | |
+| 🆕 `update-attribute-label` | Mettre à jour le label d'affichage d'un attribut (toutes langues si supportées) | `entityName`, `attributeName`, `displayName` | `languageCode` |
 
 ### Option Sets
 
@@ -146,13 +148,16 @@ Tous les outils acceptent un paramètre optionnel `environment` pour cibler un e
 |---|---|---|---|
 | `get-global-option-set` | Détails d'un global option set | `optionSetName` | |
 | 🆕 `create-global-option-set` | Créer un global option set réutilisable | `name`, `displayName`, `options` | `description`, `languageCode`, `solutionName` |
+| 🆕 `add-picklist-option` | Ajouter une option à un picklist local (entité+attribut) OU global (optionSetName) — fournir exactement un des deux. Valeur auto-assignée si omise. | `label` + (`entityName`+`attributeName` **OU** `optionSetName`) | `value`, `languageCode`, `solutionName` |
+| 🆕 `remove-picklist-option` | Retirer une option d'un picklist (local ou global) par sa valeur | `value` + (`entityName`+`attributeName` **OU** `optionSetName`) | `solutionName` |
+| 🆕 `update-picklist-option-label` | Mettre à jour le label d'une option existante (local ou global) | `value`, `label` + (`entityName`+`attributeName` **OU** `optionSetName`) | `languageCode`, `solutionName` |
 
 ### Enregistrements (CRUD)
 
 | Outil | Description | Paramètres requis | Optionnels |
 |---|---|---|---|
 | `get-record` | Lire un enregistrement par ID | `entityNamePlural`, `recordId` | |
-| `query-records` | Requête OData | `entityNamePlural`, `filter` | `maxRecords` (défaut 50) |
+| `query-records` | Requête OData | `entityNamePlural`, `filter` | `select` (projection `$select` — **fortement recommandé** pour éviter de tirer toutes les colonnes, notamment les gros champs texte comme `systemforms.formxml`), `maxRecords` (défaut 50) |
 | 🆕 `create-record` | Créer un enregistrement (lookups via `@odata.bind`) | `entityNamePlural`, `data` | |
 | 🆕 `update-record` | PATCH partiel | `entityNamePlural`, `recordId`, `data` | |
 | 🆕 `delete-record` | Supprimer un enregistrement | `entityNamePlural`, `recordId` | |
@@ -165,6 +170,8 @@ Tous les outils acceptent un paramètre optionnel `environment` pour cibler un e
 |---|---|---|---|
 | 🆕 `get-entity-forms` | Lister les formulaires d'une entité | `entityLogicalName` | `type` (2=Main, 5=QuickView, 6=QuickCreate, 7=Dashboard) |
 | 🆕 `get-form-fields` | Champs présents sur un formulaire | `formId` | |
+| 🆕 `get-form-customizability` | Vérifier si un formulaire est personnalisable (`iscustomizable.Value`, `ismanaged`). Utile pour pré-flighter une modif avant un PATCH `formxml` qui serait silencieusement ignoré sur un form managé. | `formId` | |
+| 🆕 `get-form-event-handlers` | Lister les handlers JS attachés à un formulaire (form-level + per-field), avec leur library et `functionName` | `formId` | |
 | 🆕 `add-form-field` | Ajouter un champ en bas de la 1re section (classid auto-résolu selon le type Dataverse : Lookup, DateTime, Boolean, Picklist, Memo, etc.) | `entityLogicalName`, `formId`, `attributeName` | |
 | 🆕 `add-form-field-relative` | Ajouter un champ avant/après un champ existant (classid auto-résolu selon le type) | `entityLogicalName`, `formId`, `attributeName`, `relativeToField`, `position` (`before`/`after`) | |
 | 🆕 `remove-form-field` | Retirer un champ d'un formulaire | `entityLogicalName`, `formId`, `attributeName` | |
@@ -258,6 +265,31 @@ Tous les outils acceptent un paramètre optionnel `environment` pour cibler un e
 | 🆕 `delete-web-resource` | Supprimer une web resource (irréversible) | `webResourceId` | |
 
 > ⚠️ **`content` vs `filePath` (create / update / upsert web resource)** : fournir **exactement un des deux**. `content` = chaîne base64 inline (legacy, force l'appelant — typiquement un LLM — à re-générer tout le contenu en sortie) — **validé syntaxiquement avant envoi** (caractères non-base64 ou round-trip cassé → erreur immédiate). `filePath` = chemin absolu sur disque, lu et base64-encodé côté serveur — **à préférer pour tout JS/CSS de plus de quelques Ko**, évite la regénération coûteuse côté modèle. Les deux ensemble = erreur. Aucun des deux = erreur.
+
+### 🆕 Power Pages (portail — modèle moderne `mspp_*` / `powerpagecomponent`)
+
+| Outil | Description | Paramètres requis | Optionnels |
+|---|---|---|---|
+| 🆕 `list-portal-websites` | Lister les sites Power Pages actifs (`mspp_websites`) | | `environment` |
+| 🆕 `list-portal-webpages` | Pages d'un site **groupées par `partialUrl`** (root + content résolus, prêtes à consommer) | `websiteId` | `nameFilter`, `partialUrl`, `environment` |
+| 🆕 `get-portal-webpage` | Page unique avec `mspp_copy` (HTML+Liquid), `mspp_customjavascript`, `mspp_customcss`, refs root/parent/template | `pageId` | `environment` |
+| 🆕 `list-portal-entitylists` | `mspp_entitylists` d'un site + leur `mspp_view` et table cible (matcher avec `{% include 'entity_list' key:'…' %}` du `mspp_copy`) | `websiteId` | `environment` |
+| 🆕 `list-portal-entityforms` | `mspp_entityforms` d'un site + leur `mspp_formname` et table cible | `websiteId` | `environment` |
+| 🆕 `get-portal-foundation-components` | Résout les 5 composants fondations d'un site (website, langue, page template par défaut, "Publié", page d'accueil root) prêts à feeder `AddSolutionComponent` — sans eux, l'import sur UAT/PROD échoue | `websiteId` | `environment` |
+| 🆕 `update-portal-webpage-js` | Patche `customjavascript` d'une page (CONTENT row obligatoire) via la source de vérité `powerpagecomponent.content` (JSON sérialisé) — préserve toutes les autres clés du JSON verbatim | `contentPageId`, + (`jsText` **OU** `filePath`) | `environment` |
+| 🆕 `add-portal-story-components` | Batch-ajoute à une solution : 5 fondations + pour chaque content page sa row CONTENT + ROOT (résolue) + extras (savedquery / mspp_entitylist). Idempotent. | `solutionUniqueName`, `websiteId`, `contentPageIds[]` | `extra[]`, `environment` |
+
+> ⚠️ **Pourquoi ces outils existent — modèle Enhanced Data Model Power Pages** : un PATCH direct sur `mspp_webpages` est **refusé** par le plugin Microsoft `Microsoft.Portal.SingleEntity.Plugins.CUDFromSingleEntity` (PostOperation, sync), avec un message trompeur du type « la page d'accueil doit avoir partial URL = / », **même pour un PATCH no-op** (`{ mspp_title: <valeur actuelle> }`). La cause : les tables `mspp_*` sont des **projections** maintenues par le plugin depuis l'entité unifiée `powerpagecomponent` (ObjectTypeCode 11400). Le `powerpagecomponentid` est le même GUID que `mspp_webpageid`. Le contenu typé (`customjavascript`, `customcss`, `copy`, `partialurl`, `title`, `parentpageid`, `rootwebpageid`, …) est un **JSON sérialisé** dans `powerpagecomponent.content`.
+>
+> `update-portal-webpage-js` fait donc en interne : GET `powerpagecomponents(id).content` → parse JSON → remplace **uniquement** la clé `customjavascript` → PATCH `powerpagecomponents(id).content` avec le JSON ré-encodé. Le plugin projette ensuite vers `mspp_webpages.mspp_customjavascript` dans la même transaction. **Pas de `publish-customizations` requis** côté portail moderne.
+>
+> Refuse explicitement les pages root (sans `mspp_webpagelanguageid`) — le JS vit toujours sur la page CONTENT.
+
+> ⚠️ **`jsText` vs `filePath` (update-portal-webpage-js)** : même règle que les web resources Dataverse — fournir **exactement un des deux**. `filePath` à préférer pour un round-trip byte-exact (accents UTF-8, line endings `\r\n` préservés).
+
+> ⚠️ **Componenttypes solution** : `mspp_website` = **11401**, `mspp_websitelanguage` = **11402**, tout autre composant Power Pages (webpage, pagetemplate, publishingstate, webfile, entitylist, entityform, …) = **11400** (regroupés sous "Site Components" sous le capot `powerpagecomponent`).
+
+> **Hors scope actuel** : `mspp_webfile` (assets globaux partagés), `mspp_webtemplates`, `mspp_contentsnippets`, tables legacy `adx_*`, création de nouvelles pages côté portail.
 
 ### Configuration (env vars + connection refs)
 
